@@ -1,12 +1,14 @@
+
 CREATE TABLE Users (
     user_id SERIAL PRIMARY KEY,
     username VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    firstName VARCHAR(255),
-    lastName VARCHAR(255),
-    role VARCHAR(255) NOT NULL
+    is_verified BOOLEAN DEFAULT false,
+    verification_token VARCHAR(255),
+    token_expires TIMESTAMP
 );
+
 
 CREATE TABLE Categories (
     category_id SERIAL PRIMARY KEY,
