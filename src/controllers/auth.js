@@ -18,25 +18,7 @@ oauth2Client.setCredentials({
   refresh_token: process.env.GMAIL_REFRESH_TOKEN,
 });
 
-// const SECRET_KEY = process.env.SECRET_KEY;
-
 class AuthController {
-  // register = async (req, res) => {
-  //   const { username, password, email, role } = req.body;
-  //   try {
-  //     const hashedPassword = await bcrypt.hash(password, 8);
-  //     const result = await pool.query(
-  //       "INSERT INTO users (username, password_hash, email, role) VALUES ($1, $2, $3, $4) RETURNING *",
-  //       [username, hashedPassword, email, role]
-  //     );
-
-  //     const user = result.rows[0];
-  //     res.status(201).send(user);
-  //   } catch (error) {
-  //     res.status(500).send("Error during registration: " + error.message);
-  //   }
-  // };
-
   register = async (req, res) => {
     const { username, password, email } = req.body;
     try {
@@ -139,7 +121,6 @@ class AuthController {
       ]);
 
       const user = result.rows[0];
-      console.log(user);
       if (!user) {
         return res.status(404).send("User not found");
       }

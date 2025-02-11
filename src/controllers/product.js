@@ -2,16 +2,18 @@ const pool = require("../../config/db");
 
 class ProductsController {
   async addProduct(req, res) {
-    const { title, description, price, category, stock } = req.body;
-    const imagePath = `images/${req.file.filename}`;
+    const { title, description, price, category_id, stock, status = 'Active' } = req.body;
+    const created_by_user_id = req.user.userId; // Припускаю, що інформація про користувача доступна через req.user
+    const imagePath = req.file ? `images/${req.file.filename}` : null;
+
     try {
       const result = await pool.query(
-        "INSERT INTO products (title, description, image_path, price, category, stock, created_by) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-        [title, description, imagePath, price, category, stock, req.user.userId]
+        "INSERT INTO products (title, description, image_path, price, stock, category_id, created_by_user_id, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+        [title, description, imagePath, price, stock, category_id, created_by_user_id, status]
       );
       res.status(200).json(result.rows[0]);
     } catch (error) {
-      console.error("Error creating user:", error);
+      console.error("Error creating product:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   }
@@ -21,7 +23,7 @@ class ProductsController {
       const result = await pool.query("SELECT * FROM products");
       res.json(result.rows);
     } catch (error) {
-      console.error("Error retrieving users:", error);
+      console.error("Error retrieving products:", error);
       res.status(500).json({ message: "Internal server error" });
     }
   }
@@ -29,9 +31,7 @@ class ProductsController {
   async getProductById(req, res) {
     const { id } = req.params;
     try {
-      const product = await pool.query("SELECT * FROM products WHERE id = $1", [
-        id,
-      ]);
+      const product = await pool.query("SELECT * FROM products WHERE product_id = $1", [id]);
       if (product.rows.length === 0) {
         return res.status(404).json({ message: "Product not found" });
       }
@@ -43,13 +43,13 @@ class ProductsController {
 
   async updateProduct(req, res) {
     const { id } = req.params;
-    const { title, description, price, category, stock } = req.body;
+    const { title, description, price, category_id, stock, status } = req.body;
     const imagePath = req.file ? `images/${req.file.filename}` : null;
 
     try {
       const updatedProduct = await pool.query(
-        "UPDATE products SET title = $1, description = $2, price = $3, category = $4, stock = $5, image_path = COALESCE($6, image_path) WHERE id = $7 RETURNING *",
-        [title, description, price, category, stock, imagePath, id]
+        "UPDATE products SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, image_path = COALESCE($6, image_path), status = $7 WHERE product_id = $8 RETURNING *",
+        [title, description, price, stock, category_id, imagePath, status, id]
       );
       if (updatedProduct.rows.length === 0) {
         return res.status(404).json({ message: "Product not found" });
@@ -64,7 +64,7 @@ class ProductsController {
     const { id } = req.params;
     try {
       const deletedProduct = await pool.query(
-        "DELETE FROM products WHERE id = $1 RETURNING *",
+        "DELETE FROM products WHERE product_id = $1 RETURNING *",
         [id]
       );
       if (deletedProduct.rows.length === 0) {
