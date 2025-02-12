@@ -2,6 +2,7 @@ const express = require("express");
 require("dotenv").config();
 const cors = require("cors");
 const authRoutes = require("./routes/authRoutes");
+const categoryRoutes = require("./routes/categoriesRoutes");
 
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -19,6 +20,7 @@ app.use("/images", express.static("public/images"));
 
 // Api routes
 app.use("/api/auth", authRoutes);
+app.use("/api", categoryRoutes);
 
 app.listen(PORT, () =>
   console.log(`Server running on http://localhost:${PORT}`)
