@@ -16,6 +16,26 @@ CREATE TABLE Categories (
     description TEXT
 );
 
+CREATE TABLE Statuses (
+    status_id SERIAL PRIMARY KEY,
+    status_name VARCHAR(50) NOT NULL
+);
+
+INSERT INTO Statuses (status_name) VALUES ('Active'), ('Inactive'), ('Out of Stock');
+
+
+CREATE TABLE Products (
+    product_id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    price DECIMAL NOT NULL,
+    stock INTEGER NOT NULL,
+    category_id INTEGER NOT NULL,
+    created_by_user_id INTEGER NOT NULL,
+    status_id INTEGER NOT NULL REFERENCES Statuses(status_id),
+    image_path TEXT
+);
+
 CREATE TABLE Products (
     product_id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
