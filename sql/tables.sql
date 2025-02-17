@@ -42,7 +42,7 @@ CREATE TABLE Product_Attributes (
     attribute_id SERIAL PRIMARY KEY,
     product_id INTEGER NOT NULL REFERENCES Products(product_id) ON DELETE CASCADE,
     attribute_key VARCHAR(255) NOT NULL,
-    attribute_value TEXT
+    attribute_value TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -69,3 +69,10 @@ CREATE TABLE Order_Items (
     price DECIMAL NOT NULL
 );
 
+CREATE TABLE Product_Images (
+    image_id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES Products(product_id) ON DELETE CASCADE,
+    image_path TEXT NOT NULL,
+    is_primary BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
