@@ -4,7 +4,7 @@ const authenticate = require("../middlewares/authenticate");
 const upload = require("../middlewares/upload");
 
 const router = express.Router();
-router.get("/products", productsController.getProducts);
+router.get("/products", authenticate, productsController.getProducts);
 router.post(
   "/product/add",
   authenticate,

@@ -21,7 +21,7 @@ CREATE TABLE Statuses (
     status_name VARCHAR(50) NOT NULL
 );
 
-INSERT INTO Statuses (status_name) VALUES ('Active'), ('Inactive'), ('Out of Stock');
+INSERT INTO Statuses (status_name) VALUES ('Активний'), ('Неактивний'), ('Немає на складі');
 
 
 CREATE TABLE Products (
@@ -47,6 +47,14 @@ CREATE TABLE Product_Attributes (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE Product_Images (
+    image_id SERIAL PRIMARY KEY,
+    product_id INTEGER NOT NULL REFERENCES Products(product_id) ON DELETE CASCADE,
+    image_path TEXT NOT NULL,
+    is_primary BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE Customers (
     customer_id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
@@ -69,10 +77,4 @@ CREATE TABLE Order_Items (
     price DECIMAL NOT NULL
 );
 
-CREATE TABLE Product_Images (
-    image_id SERIAL PRIMARY KEY,
-    product_id INTEGER NOT NULL REFERENCES Products(product_id) ON DELETE CASCADE,
-    image_path TEXT NOT NULL,
-    is_primary BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+

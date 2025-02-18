@@ -24,15 +24,16 @@ class ProductsController {
     const { id } = req.params;
     try {
       const product = await pool.query(
-        `SELECT p.*, s.status_name, 
+        `SELECT p.*, s.status_name, c.title as category_title,
         json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
         json_agg(json_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) FILTER (WHERE pi.image_id IS NOT NULL) AS images
         FROM products p
         JOIN statuses s ON p.status_id = s.status_id
+        JOIN categories c ON p.category_id = c.category_id
         LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
         LEFT JOIN product_images pi ON p.product_id = pi.product_id
         WHERE p.product_id = $1
-        GROUP BY p.product_id, s.status_name`,
+        GROUP BY p.product_id, s.status_name, c.title`,
         [id]
       );
 
@@ -94,7 +95,7 @@ class ProductsController {
 
       await pool.query("COMMIT");
       res.status(201).json({
-        message: "Product created successfully",
+        message: "Продукт створено успішно",
         productId: productId,
       });
     } catch (error) {
@@ -117,32 +118,44 @@ class ProductsController {
       status_id,
       attributes,
     } = req.body;
-    const imagePath = req.file ? `images/${req.file.filename}` : null;
+    const images = req.files;
+    const primaryImageIndex = req.body.primary;
 
     try {
       await pool.query("BEGIN");
+
       const updatedProductResult = await pool.query(
-        `UPDATE products SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, image_path = COALESCE($6, image_path), status_id = $7 WHERE product_id = $8 RETURNING *`,
-        [
-          title,
-          description,
-          price,
-          stock,
-          category_id,
-          imagePath,
-          status_id,
-          id,
-        ]
+        `UPDATE products SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, status_id = $6 WHERE product_id = $7 RETURNING *`,
+        [title, description, price, stock, category_id, status_id, id]
       );
 
       await pool.query("DELETE FROM product_attributes WHERE product_id = $1", [
         id,
       ]);
-      for (const attr of attributes) {
-        await pool.query(
-          `INSERT INTO product_attributes (product_id, attribute_key, attribute_value) VALUES ($1, $2, $3)`,
-          [id, attr.key, attr.value]
-        );
+
+      if (attributes && attributes.length > 0) {
+        for (const attr of attributes) {
+          await pool.query(
+            `INSERT INTO product_attributes (product_id, attribute_key, attribute_value)
+             VALUES ($1, $2, $3)`,
+            [id, attr.key, attr.value]
+          );
+        }
+      }
+
+      await pool.query("DELETE FROM product_images WHERE product_id = $1", [
+        id,
+      ]);
+
+      if (images && images.length > 0) {
+        for (let i = 0; i < images.length; i++) {
+          const isPrimary = i.toString() === primaryImageIndex;
+          await pool.query(
+            `INSERT INTO product_images (product_id, image_path, is_primary)
+             VALUES ($1, $2, $3)`,
+            [id, images[i].path, isPrimary]
+          );
+        }
       }
 
       await pool.query("COMMIT");
@@ -171,7 +184,7 @@ class ProductsController {
       );
 
       await pool.query("COMMIT");
-      res.json({ message: "Product deleted successfully" });
+      res.json({ message: "Продукт видалено успішно" });
     } catch (error) {
       await pool.query("ROLLBACK");
       res
