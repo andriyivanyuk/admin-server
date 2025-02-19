@@ -16,7 +16,7 @@ router.get("/product/:id", authenticate, productsController.getProductById);
 router.put(
   "/product/:id",
   authenticate,
-  upload.single("image"),
+  upload.array("images", 5),
   productsController.updateProduct
 );
 router.delete("/product/:id", authenticate, productsController.deleteProduct);
