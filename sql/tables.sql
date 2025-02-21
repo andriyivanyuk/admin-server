@@ -51,8 +51,9 @@ CREATE TABLE Product_Images (
     product_id INTEGER NOT NULL REFERENCES Products(product_id) ON DELETE CASCADE,
     image_path TEXT NOT NULL,
     is_primary BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (product_id, image_path)
+);  
 
 CREATE TABLE Customers (
     customer_id SERIAL PRIMARY KEY,

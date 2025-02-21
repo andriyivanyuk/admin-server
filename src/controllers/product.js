@@ -160,10 +160,12 @@ class ProductsController {
               [product_id, img.path]
             );
           } else {
-            console.log(img, "THIS ONE SHOULD BE SAVED");
+            console.log(img, "THIS ONE SHOULD BE SAVED/UPDATED");
             await pool.query(
               `INSERT INTO product_images (product_id, image_path, is_primary)
-                 VALUES ($1, $2, $3)`,
+               VALUES ($1, $2, $3)
+               ON CONFLICT (product_id, image_path) DO UPDATE
+               SET is_primary = EXCLUDED.is_primary`,
               [product_id, img.path, img.isPrimary]
             );
           }
