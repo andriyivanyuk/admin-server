@@ -2,6 +2,8 @@ const pool = require("../../config/db");
 const fs = require("fs");
 const path = require("path");
 
+const imageService = require("../services/imageService");
+
 class ProductsController {
   async getProducts(req, res) {
     try {
@@ -62,7 +64,7 @@ class ProductsController {
       attributes,
     } = req.body;
     const images = req.files;
-    const primaryImageIndex = req.body.primary;
+    const primary = req.body.primary;
 
     try {
       await pool.query("BEGIN");
@@ -85,21 +87,19 @@ class ProductsController {
         }
       }
 
-      if (images) {
-        for (let i = 0; i < images.length; i++) {
-          const isPrimary = i.toString() === primaryImageIndex;
-          await pool.query(
-            `INSERT INTO product_images (product_id, image_path, is_primary)
-                   VALUES ($1, $2, $3)`,
-            [productId, images[i].path, isPrimary]
-          );
-        }
-      }
+      const uploadedImages = await imageService.uploadImages(
+        productId,
+        images.map((img, index) => ({
+          path: img.path,
+          isPrimary: index.toString() === primary,
+        }))
+      );
 
       await pool.query("COMMIT");
-      res.status(201).json({
+      res.status(200).json({
         message: "Product created successfully",
         productId: productId,
+        images: uploadedImages,
       });
     } catch (error) {
       await pool.query("ROLLBACK");

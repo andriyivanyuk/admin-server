@@ -7,18 +7,13 @@ const router = express.Router();
 router.get("/products", authenticate, productsController.getProducts);
 router.post(
   "/product/add",
+  upload.array("images", 10),
   authenticate,
-  upload.array("images", 5),
   productsController.addProduct
 );
 
 router.get("/product/:id", authenticate, productsController.getProductById);
-router.put(
-  "/product/:id",
-  authenticate,
-  upload.array("images", 5),
-  productsController.updateProduct
-);
+router.put("/product/:id", authenticate, productsController.updateProduct);
 router.delete("/product/:id", authenticate, productsController.deleteProduct);
 
 module.exports = router;
