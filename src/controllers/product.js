@@ -153,17 +153,22 @@ class ProductsController {
       // Видалення зображень, позначених для видалення
       const imagesToDelete = updatedImages.filter((img) => img.toDelete);
       for (const img of imagesToDelete) {
-        console.log("I am deleting");
+        console.log("DELETING");
         await pool.query(
           `DELETE FROM product_images WHERE product_id = $1 AND image_path = $2`,
           [product_id, img.path]
         );
+        const imagePath = path.join(__dirname, "..", "..", img.path);
+        console.log(imagePath);
+        fs.unlink(imagePath, (err) => {
+          if (err) console.error("Failed to delete image:", err);
+        });
       }
 
       // Оновлення існуючих зображень
       const imagesToUpdate = updatedImages.filter((img) => !img.toDelete);
       for (const img of imagesToUpdate) {
-        console.log("I am updating");
+        console.log("UPDATING");
         await pool.query(
           `INSERT INTO product_images (product_id, image_path, is_primary)
            VALUES ($1, $2, $3)
@@ -175,7 +180,7 @@ class ProductsController {
 
       // Додавання нових зображень
       for (let index = 0; index < newImages.length; index++) {
-        console.log("I am adding new");
+        console.log("ADDING NEW");
         const isPrimary = index.toString() === primary;
         await pool.query(
           `INSERT INTO product_images (product_id, image_path, is_primary)
@@ -228,6 +233,10 @@ class ProductsController {
       await pool.query("DELETE FROM product_attributes WHERE product_id = $1", [
         id,
       ]);
+      await pool.query(
+        "DELETE FROM products WHERE product_id = $1 RETURNING *",
+        [id]
+      );
 
       images.rows.forEach((image) => {
         const imagePath = path.join(__dirname, "..", "..", image.image_path);
