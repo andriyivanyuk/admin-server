@@ -144,51 +144,12 @@ class ProductsController {
         for (const attr of attributes) {
           await pool.query(
             `INSERT INTO product_attributes (product_id, attribute_key, attribute_value)
-                   VALUES ($1, $2, $3)`,
+             VALUES ($1, $2, $3)`,
             [product_id, attr.key, attr.value]
           );
         }
       }
 
-      // // Оновлення та видалення зображень
-      // if (updatedImages && updatedImages.length > 0) {
-      //   for (const img of updatedImages) {
-      //     if (img.toDelete) {
-      //       console.log(img, "SHOULD BE DELETED");
-      //       await pool.query(
-      //         `DELETE FROM product_images WHERE product_id = $1 AND image_path = $2`,
-      //         [product_id, img.path]
-      //       );
-      //     } else {
-      //       console.log(img, "SHOULD BE INSERTED ELSE DELETION");
-      //       if (img) {
-      //         console.log("Image exists");
-      //         await pool.query(
-      //           `INSERT INTO product_images (product_id, image_path, is_primary)
-      //            VALUES ($1, $2, $3)
-      //            ON CONFLICT (product_id, image_path) DO UPDATE
-      //            SET is_primary = EXCLUDED.is_primary`,
-      //           [product_id, img.path, img.isPrimary]
-      //         );
-      //       }
-      //     }
-      //   }
-      // }
-
-      // if (newImages) {
-      //   for (let index = 0; index < newImages.length; index++) {
-      //     const image = newImages[index];
-      //     const isPrimary = index.toString() === primary;
-      //     console.log(img, "NEW IMAGES ARE INSERTED");
-      //     await pool.query(
-      //       `INSERT INTO product_images (product_id, image_path, is_primary)
-      //          VALUES ($1, $2, $3)
-      //          ON CONFLICT (product_id, image_path) DO UPDATE
-      //          SET is_primary = EXCLUDED.is_primary`,
-      //       [product_id, image.path, isPrimary]
-      //     );
-      //   }
-      // }
       // Видалення зображень, позначених для видалення
       const imagesToDelete = updatedImages.filter((img) => img.toDelete);
       for (const img of imagesToDelete) {
@@ -205,9 +166,9 @@ class ProductsController {
         console.log("I am updating");
         await pool.query(
           `INSERT INTO product_images (product_id, image_path, is_primary)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (product_id, image_path) DO UPDATE
-         SET is_primary = EXCLUDED.is_primary`,
+           VALUES ($1, $2, $3)
+           ON CONFLICT (product_id, image_path) DO UPDATE
+           SET is_primary = EXCLUDED.is_primary`,
           [product_id, img.path, img.isPrimary]
         );
       }
@@ -218,15 +179,30 @@ class ProductsController {
         const isPrimary = index.toString() === primary;
         await pool.query(
           `INSERT INTO product_images (product_id, image_path, is_primary)
-         VALUES ($1, $2, $3)`,
+           VALUES ($1, $2, $3)`,
           [product_id, newImages[index].path, isPrimary]
         );
       }
 
+      const updatedProduct = await pool.query(
+        `SELECT p.*, s.status_name, c.title as category_title,
+         json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
+         json_agg(json_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) FILTER (WHERE pi.image_id IS NOT NULL) AS images
+         FROM products p
+         JOIN statuses s ON p.status_id = s.status_id
+         JOIN categories c ON p.category_id = c.category_id
+         LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
+         LEFT JOIN product_images pi ON p.product_id = pi.product_id
+         WHERE p.product_id = $1
+         GROUP BY p.product_id, s.status_name, c.title`,
+        [product_id]
+      );
+
       await pool.query("COMMIT");
-      res
-        .status(200)
-        .json({ message: "Product updated successfully", product_id });
+      res.status(200).json({
+        message: "Product updated successfully",
+        product: updatedProduct.rows[0],
+      });
     } catch (error) {
       await pool.query("ROLLBACK");
       console.error("Error updating product:", error);
@@ -252,10 +228,6 @@ class ProductsController {
       await pool.query("DELETE FROM product_attributes WHERE product_id = $1", [
         id,
       ]);
-      const deletedProductResult = await pool.query(
-        "DELETE FROM products WHERE product_id = $1 RETURNING *",
-        [id]
-      );
 
       images.rows.forEach((image) => {
         const imagePath = path.join(__dirname, "..", "..", image.image_path);
