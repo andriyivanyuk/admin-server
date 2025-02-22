@@ -124,7 +124,7 @@ class ProductsController {
     } = req.body;
     const updatedImages = JSON.parse(req.body.updatedImages);
     const newImages = req.files;
-    const primaryImageIndex = req.body.primary;
+    const primary = req.body.primary;
 
     try {
       await pool.query("BEGIN");
@@ -150,39 +150,77 @@ class ProductsController {
         }
       }
 
-      // Оновлення та видалення зображень
-      if (updatedImages && updatedImages.length > 0) {
-        for (const img of updatedImages) {
-          if (img.toDelete) {
-            console.log(img, "THIS ONE SHOULD BE DELETED");
-            await pool.query(
-              `DELETE FROM product_images WHERE product_id = $1 AND image_path = $2`,
-              [product_id, img.path]
-            );
-          } else {
-            console.log(img, "THIS ONE SHOULD BE SAVED/UPDATED");
-            await pool.query(
-              `INSERT INTO product_images (product_id, image_path, is_primary)
-               VALUES ($1, $2, $3)
-               ON CONFLICT (product_id, image_path) DO UPDATE
-               SET is_primary = EXCLUDED.is_primary`,
-              [product_id, img.path, img.isPrimary]
-            );
-          }
-        }
+      // // Оновлення та видалення зображень
+      // if (updatedImages && updatedImages.length > 0) {
+      //   for (const img of updatedImages) {
+      //     if (img.toDelete) {
+      //       console.log(img, "SHOULD BE DELETED");
+      //       await pool.query(
+      //         `DELETE FROM product_images WHERE product_id = $1 AND image_path = $2`,
+      //         [product_id, img.path]
+      //       );
+      //     } else {
+      //       console.log(img, "SHOULD BE INSERTED ELSE DELETION");
+      //       if (img) {
+      //         console.log("Image exists");
+      //         await pool.query(
+      //           `INSERT INTO product_images (product_id, image_path, is_primary)
+      //            VALUES ($1, $2, $3)
+      //            ON CONFLICT (product_id, image_path) DO UPDATE
+      //            SET is_primary = EXCLUDED.is_primary`,
+      //           [product_id, img.path, img.isPrimary]
+      //         );
+      //       }
+      //     }
+      //   }
+      // }
+
+      // if (newImages) {
+      //   for (let index = 0; index < newImages.length; index++) {
+      //     const image = newImages[index];
+      //     const isPrimary = index.toString() === primary;
+      //     console.log(img, "NEW IMAGES ARE INSERTED");
+      //     await pool.query(
+      //       `INSERT INTO product_images (product_id, image_path, is_primary)
+      //          VALUES ($1, $2, $3)
+      //          ON CONFLICT (product_id, image_path) DO UPDATE
+      //          SET is_primary = EXCLUDED.is_primary`,
+      //       [product_id, image.path, isPrimary]
+      //     );
+      //   }
+      // }
+      // Видалення зображень, позначених для видалення
+      const imagesToDelete = updatedImages.filter((img) => img.toDelete);
+      for (const img of imagesToDelete) {
+        console.log("I am deleting");
+        await pool.query(
+          `DELETE FROM product_images WHERE product_id = $1 AND image_path = $2`,
+          [product_id, img.path]
+        );
+      }
+
+      // Оновлення існуючих зображень
+      const imagesToUpdate = updatedImages.filter((img) => !img.toDelete);
+      for (const img of imagesToUpdate) {
+        console.log("I am updating");
+        await pool.query(
+          `INSERT INTO product_images (product_id, image_path, is_primary)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (product_id, image_path) DO UPDATE
+         SET is_primary = EXCLUDED.is_primary`,
+          [product_id, img.path, img.isPrimary]
+        );
       }
 
       // Додавання нових зображень
-      if (newImages && newImages.length > 0) {
-        for (const image of newImages) {
-          const isPrimary =
-            newImages.indexOf(image).toString() === primaryImageIndex;
-          await pool.query(
-            `INSERT INTO product_images (product_id, image_path, is_primary)
-                   VALUES ($1, $2, $3)`,
-            [product_id, image.path, isPrimary]
-          );
-        }
+      for (let index = 0; index < newImages.length; index++) {
+        console.log("I am adding new");
+        const isPrimary = index.toString() === primary;
+        await pool.query(
+          `INSERT INTO product_images (product_id, image_path, is_primary)
+         VALUES ($1, $2, $3)`,
+          [product_id, newImages[index].path, isPrimary]
+        );
       }
 
       await pool.query("COMMIT");
