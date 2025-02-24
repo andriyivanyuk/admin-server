@@ -3,14 +3,6 @@ const fs = require("fs");
 const path = require("path");
 
 class ImageService {
-  async uploadImage(productId, imagePath, isPrimary) {
-    const result = await pool.query(
-      "INSERT INTO Product_Images (product_id, image_path, is_primary) VALUES ($1, $2, $3) RETURNING *;",
-      [productId, imagePath, isPrimary]
-    );
-    return result.rows[0];
-  }
-
   async uploadImages(productId, images) {
     const client = await pool.connect();
     try {
@@ -34,6 +26,37 @@ class ImageService {
     }
   }
 
+  async deleteImages(imageIds) {
+    const ids = Array.isArray(imageIds) ? imageIds : JSON.parse(imageIds);
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const selectQuery = `
+        SELECT image_path FROM Product_Images WHERE image_id = ANY($1);
+      `;
+      const imagePaths = await client.query(selectQuery, [ids]);
+
+      const deleteFilesPromises = imagePaths.rows.map((row) =>
+        fs.promises.unlink(path.join(__dirname, "..", "..", row.image_path))
+      );
+
+      await Promise.all(deleteFilesPromises);
+
+      const deleteQuery = `
+        DELETE FROM Product_Images WHERE image_id = ANY($1);
+      `;
+      await client.query(deleteQuery, [ids]);
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      console.error("Error during deleting images: ", error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   async getImageById(imageId) {
     const result = await pool.query(
       "SELECT * FROM Product_Images WHERE image_id = $1;",
@@ -48,22 +71,6 @@ class ImageService {
       [productId]
     );
     return result.rows;
-  }
-
-  async updateImage(imageId, imagePath, isPrimary) {
-    const result = await pool.query(
-      "UPDATE Product_Images SET image_path = $1, is_primary = $2 WHERE image_id = $3 RETURNING *;",
-      [imagePath, isPrimary, imageId]
-    );
-    return result.rows[0];
-  }
-
-  async deleteImage(imageId) {
-    const result = await pool.query(
-      "DELETE FROM Product_Images WHERE image_id = $1;",
-      [imageId]
-    );
-    return result.rowCount > 0;
   }
 }
 

@@ -29,8 +29,17 @@ class ProductsController {
     try {
       const product = await pool.query(
         `SELECT p.*, s.status_name, c.title as category_title,
-        json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
-        json_agg(json_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) FILTER (WHERE pi.image_id IS NOT NULL) AS images
+        json_agg(json_build_object(
+          'key', pa.attribute_key, 
+          'value', pa.attribute_value
+        )) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
+        
+        json_agg(json_build_object(
+          'image_id', pi.image_id, 
+          'image_path', pi.image_path, 
+          'is_primary', pi.is_primary
+        )) FILTER (WHERE pi.image_id IS NOT NULL) AS images
+
         FROM products p
         JOIN statuses s ON p.status_id = s.status_id
         JOIN categories c ON p.category_id = c.category_id
@@ -91,7 +100,6 @@ class ProductsController {
         productId,
         images.map((img, index) => ({
           path: img.path,
-          isPrimary: index.toString() === primary,
         }))
       );
 
@@ -121,25 +129,33 @@ class ProductsController {
       category_id,
       status_id,
       attributes,
+      deleteImageIds,
     } = req.body;
-    const updatedImages = JSON.parse(req.body.updatedImages);
+
     const newImages = req.files;
     const primary = req.body.primary;
 
     try {
       await pool.query("BEGIN");
 
-      // Оновлення основної інформації про продукт
+      if (deleteImageIds && deleteImageIds.length > 0) {
+        await imageService.deleteImages(deleteImageIds);
+      }
+
       await pool.query(
         `UPDATE products SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, status_id = $6
            WHERE product_id = $7`,
         [title, description, price, stock, category_id, status_id, product_id]
       );
 
-      // Видалення та оновлення атрибутів продукту
-      await pool.query(`DELETE FROM product_attributes WHERE product_id = $1`, [
-        product_id,
-      ]);
+      await pool.query(
+        "UPDATE product_images SET is_primary = false WHERE product_id = $1",
+        [product_id]
+      );
+
+      // await pool.query(`DELETE FROM product_attributes WHERE product_id = $1`, [
+      //   product_id,
+      // ]);
       if (attributes && attributes.length > 0) {
         for (const attr of attributes) {
           await pool.query(
@@ -150,42 +166,21 @@ class ProductsController {
         }
       }
 
-      // Видалення зображень, позначених для видалення
-      const imagesToDelete = updatedImages.filter((img) => img.toDelete);
-      for (const img of imagesToDelete) {
-        console.log("DELETING");
-        await pool.query(
-          `DELETE FROM product_images WHERE product_id = $1 AND image_path = $2`,
-          [product_id, img.path]
-        );
-        const imagePath = path.join(__dirname, "..", "..", img.path);
-        console.log(imagePath);
-        fs.unlink(imagePath, (err) => {
-          if (err) console.error("Failed to delete image:", err);
-        });
-      }
+      const defaultImages = await imageService.getImagesByProductId(product_id);
 
-      // Оновлення існуючих зображень
-      const imagesToUpdate = updatedImages.filter((img) => !img.toDelete);
-      for (const img of imagesToUpdate) {
-        console.log("UPDATING");
-        await pool.query(
-          `INSERT INTO product_images (product_id, image_path, is_primary)
-           VALUES ($1, $2, $3)
-           ON CONFLICT (product_id, image_path) DO UPDATE
-           SET is_primary = EXCLUDED.is_primary`,
-          [product_id, img.path, img.isPrimary]
-        );
-      }
+      const selectedImageId = defaultImages[parseInt(primary)].image_id;
+      await pool.query(
+        "UPDATE product_images SET is_primary = true WHERE image_id = $1",
+        [selectedImageId]
+      );
 
-      // Додавання нових зображень
-      for (let index = 0; index < newImages.length; index++) {
-        console.log("ADDING NEW");
-        const isPrimary = index.toString() === primary;
-        await pool.query(
-          `INSERT INTO product_images (product_id, image_path, is_primary)
-           VALUES ($1, $2, $3)`,
-          [product_id, newImages[index].path, isPrimary]
+      if (newImages.length) {
+        await imageService.uploadImages(
+          product_id,
+          newImages.map((img, index) => ({
+            path: img.path,
+            isPrimary: false,
+          }))
         );
       }
 

@@ -13,7 +13,12 @@ router.post(
 );
 
 router.get("/product/:id", authenticate, productsController.getProductById);
-router.put("/product/:id", authenticate, productsController.updateProduct);
+router.put(
+  "/product/:id",
+  upload.array("images", 10),
+  authenticate,
+  productsController.updateProduct
+);
 router.delete("/product/:id", authenticate, productsController.deleteProduct);
 
 module.exports = router;
