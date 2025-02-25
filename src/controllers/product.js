@@ -29,24 +29,17 @@ class ProductsController {
     try {
       const product = await pool.query(
         `SELECT p.*, s.status_name, c.title as category_title,
-        json_agg(json_build_object(
-          'key', pa.attribute_key, 
-          'value', pa.attribute_value
-        )) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
-        
-        json_agg(json_build_object(
-          'image_id', pi.image_id, 
-          'image_path', pi.image_path, 
-          'is_primary', pi.is_primary
-        )) FILTER (WHERE pi.image_id IS NOT NULL) AS images
-
-        FROM products p
-        JOIN statuses s ON p.status_id = s.status_id
-        JOIN categories c ON p.category_id = c.category_id
-        LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
-        LEFT JOIN product_images pi ON p.product_id = pi.product_id
-        WHERE p.product_id = $1
-        GROUP BY p.product_id, s.status_name, c.title`,
+            (SELECT json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) 
+                FROM product_attributes pa WHERE pa.product_id = p.product_id) AS attributes,
+            
+            (SELECT json_agg(json_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) 
+                FROM product_images pi WHERE pi.product_id = p.product_id) AS images
+            
+            FROM products p
+            JOIN statuses s ON p.status_id = s.status_id
+            JOIN categories c ON p.category_id = c.category_id
+            WHERE p.product_id = $1
+            GROUP BY p.product_id, s.status_name, c.title`,
         [id]
       );
 
@@ -100,6 +93,7 @@ class ProductsController {
         productId,
         images.map((img, index) => ({
           path: img.path,
+          isPrimary: index.toString() === primary,
         }))
       );
 
@@ -130,10 +124,11 @@ class ProductsController {
       status_id,
       attributes,
       deleteImageIds,
+      selectedImageId,
     } = req.body;
 
     const newImages = req.files;
-    const primary = req.body.primary;
+    const selectedId = selectedImageId;
 
     try {
       await pool.query("BEGIN");
@@ -168,11 +163,12 @@ class ProductsController {
 
       const defaultImages = await imageService.getImagesByProductId(product_id);
 
-      const selectedImageId = defaultImages[parseInt(primary)].image_id;
-      await pool.query(
-        "UPDATE product_images SET is_primary = true WHERE image_id = $1",
-        [selectedImageId]
-      );
+      if (defaultImages.length && !!selectedId) {
+        await pool.query(
+          "UPDATE product_images SET is_primary = true WHERE image_id = $1",
+          [parseInt(selectedId)]
+        );
+      }
 
       if (newImages.length) {
         await imageService.uploadImages(
@@ -184,17 +180,32 @@ class ProductsController {
         );
       }
 
+      // const updatedProduct = await pool.query(
+      //   `SELECT p.*, s.status_name, c.title as category_title,
+      //    json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
+      //    json_agg(json_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) FILTER (WHERE pi.image_id IS NOT NULL) AS images
+      //    FROM products p
+      //    JOIN statuses s ON p.status_id = s.status_id
+      //    JOIN categories c ON p.category_id = c.category_id
+      //    LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
+      //    LEFT JOIN product_images pi ON p.product_id = pi.product_id
+      //    WHERE p.product_id = $1
+      //    GROUP BY p.product_id, s.status_name, c.title`,
+      //   [product_id]
+      // );
       const updatedProduct = await pool.query(
         `SELECT p.*, s.status_name, c.title as category_title,
-         json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
-         json_agg(json_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) FILTER (WHERE pi.image_id IS NOT NULL) AS images
-         FROM products p
-         JOIN statuses s ON p.status_id = s.status_id
-         JOIN categories c ON p.category_id = c.category_id
-         LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
-         LEFT JOIN product_images pi ON p.product_id = pi.product_id
-         WHERE p.product_id = $1
-         GROUP BY p.product_id, s.status_name, c.title`,
+            (SELECT json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) 
+                FROM product_attributes pa WHERE pa.product_id = p.product_id) AS attributes,
+            
+            (SELECT json_agg(json_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) 
+                FROM product_images pi WHERE pi.product_id = p.product_id) AS images
+            
+            FROM products p
+            JOIN statuses s ON p.status_id = s.status_id
+            JOIN categories c ON p.category_id = c.category_id
+            WHERE p.product_id = $1
+            GROUP BY p.product_id, s.status_name, c.title`,
         [product_id]
       );
 
