@@ -1,6 +1,9 @@
 const express = require("express");
 require("dotenv").config();
 const cors = require("cors");
+const http = require("http"); // Додайте цей рядок
+const { setupWebSocket } = require("./services/websocket");
+
 const authRoutes = require("./routes/authRoutes");
 const categoryRoutes = require("./routes/categoriesRoutes");
 const productStatusesRoutes = require("./routes/statusesRoutes");
@@ -26,6 +29,11 @@ app.use("/api", categoryRoutes);
 app.use("/api", productStatusesRoutes);
 app.use("/api", productRoutes);
 
-app.listen(PORT, () =>
+const server = http.createServer(app); // Використовуйте http.createServer
+
+// Налаштування WebSocket
+setupWebSocket(server);
+
+server.listen(PORT, () =>
   console.log(`Server running on http://localhost:${PORT}`)
 );
