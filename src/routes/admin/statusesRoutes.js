@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const productStatusesController = require("../controllers/productStatus");
-const authenticate = require("../middlewares/authenticate");
+const productStatusesController = require("../../controllers/admin/productStatus");
+const authenticate = require("../../middlewares/authenticate");
 
 router.get(
   "/product/statuses",

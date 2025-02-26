@@ -1,22 +1,43 @@
-const pool = require("../../config/db");
+const pool = require("../../../config/db");
 const fs = require("fs");
 const path = require("path");
 
-const imageService = require("../services/imageService");
+const imageService = require("../../services/imageService");
 
 class ProductsController {
   async getProducts(req, res) {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+    const search = req.query.search || "";
+
     try {
-      const result = await pool.query(
-        `SELECT p.*, s.status_name, json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
-        json_agg(json_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) FILTER (WHERE pi.image_id IS NOT NULL) AS images
-        FROM products p
-        JOIN statuses s ON p.status_id = s.status_id
-        LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
-        LEFT JOIN product_images pi ON p.product_id = pi.product_id
-        GROUP BY p.product_id, s.status_name`
-      );
-      res.json(result.rows);
+      const countQuery = `
+      SELECT COUNT(*) AS total FROM products WHERE lower(title) LIKE lower($1)
+    `;
+      const countResult = await pool.query(countQuery, [`%${search}%`]);
+      const totalProducts = parseInt(countResult.rows[0].total);
+
+      // Вибираємо продукти з бази
+      const productQuery = `
+      SELECT p.*, s.status_name, json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
+      json_agg(json_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) FILTER (WHERE pi.image_id IS NOT NULL) AS images
+      FROM products p
+      JOIN statuses s ON p.status_id = s.status_id
+      LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
+      LEFT JOIN product_images pi ON p.product_id = pi.product_id
+      WHERE lower(p.title) LIKE lower($1)
+      GROUP BY p.product_id, s.status_name
+      ORDER BY p.product_id
+      LIMIT $2 OFFSET $3
+    `;
+      const result = await pool.query(productQuery, [
+        `%${search}%`,
+        limit,
+        offset,
+      ]);
+
+      res.json({ products: result.rows, total: totalProducts, page, limit });
     } catch (error) {
       res
         .status(500)

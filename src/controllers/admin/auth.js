@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const { google } = require("googleapis");
 
-const pool = require("../../config/db");
+const pool = require("../../../config/db");
 
 const OAuth2 = google.auth.OAuth2;
 

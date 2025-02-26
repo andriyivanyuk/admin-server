@@ -1,7 +1,7 @@
 const express = require("express");
-const productsController = require("../controllers/product");
-const authenticate = require("../middlewares/authenticate");
-const upload = require("../middlewares/upload");
+const productsController = require("../../controllers/admin/product");
+const authenticate = require("../../middlewares/authenticate");
+const upload = require("../../middlewares/upload");
 
 const router = express.Router();
 router.get("/products", authenticate, productsController.getProducts);

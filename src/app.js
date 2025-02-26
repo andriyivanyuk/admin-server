@@ -4,10 +4,10 @@ const cors = require("cors");
 const http = require("http"); // Додайте цей рядок
 const { setupWebSocket } = require("./services/websocket");
 
-const authRoutes = require("./routes/authRoutes");
-const categoryRoutes = require("./routes/categoriesRoutes");
-const productStatusesRoutes = require("./routes/statusesRoutes");
-const productRoutes = require("./routes/productRoutes");
+const authRoutes = require("./routes/admin/authRoutes");
+const categoryRoutes = require("./routes/admin/categoriesRoutes");
+const productStatusesRoutes = require("./routes/admin/statusesRoutes");
+const productRoutes = require("./routes/admin/productRoutes");
 
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -23,7 +23,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
-// Api routes
+// ADMIN routes
 app.use("/api/auth", authRoutes);
 app.use("/api", categoryRoutes);
 app.use("/api", productStatusesRoutes);
