@@ -4,7 +4,7 @@ const path = require("path");
 
 const imageService = require("../../services/imageService");
 
-class ProductsController {
+class AdminProductsController {
   async getProducts(req, res) {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
@@ -201,19 +201,6 @@ class ProductsController {
         );
       }
 
-      // const updatedProduct = await pool.query(
-      //   `SELECT p.*, s.status_name, c.title as category_title,
-      //    json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
-      //    json_agg(json_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) FILTER (WHERE pi.image_id IS NOT NULL) AS images
-      //    FROM products p
-      //    JOIN statuses s ON p.status_id = s.status_id
-      //    JOIN categories c ON p.category_id = c.category_id
-      //    LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
-      //    LEFT JOIN product_images pi ON p.product_id = pi.product_id
-      //    WHERE p.product_id = $1
-      //    GROUP BY p.product_id, s.status_name, c.title`,
-      //   [product_id]
-      // );
       const updatedProduct = await pool.query(
         `SELECT p.*, s.status_name, c.title as category_title,
             (SELECT json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) 
@@ -283,4 +270,4 @@ class ProductsController {
   }
 }
 
-module.exports = new ProductsController();
+module.exports = new AdminProductsController();

@@ -55,11 +55,12 @@ CREATE TABLE Product_Images (
     UNIQUE (product_id, image_path)
 );  
 
+
 CREATE TABLE Customers (
     customer_id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    address TEXT NOT NULL
+    phone VARCHAR(255)
 );
 
 CREATE TABLE Orders (
