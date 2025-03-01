@@ -12,6 +12,7 @@ const categoryRoutes = require("./routes/admin/categoriesRoutes");
 const productStatusesRoutes = require("./routes/admin/statusesRoutes");
 
 const productAdminRoutes = require("./routes/admin/productRoutes");
+const orderAdminRoutes = require("./routes/admin/orderRoutes");
 
 //Client routes
 const productClientRoutes = require("./routes/client/productRoutes");
@@ -43,6 +44,7 @@ app.use("/api/auth/admin", cors(corsOptionsAdmin), authRoutes);
 app.use("/api/admin", cors(corsOptionsAdmin), categoryRoutes);
 app.use("/api/admin", cors(corsOptionsAdmin), productStatusesRoutes);
 app.use("/api/admin", cors(corsOptionsAdmin), productAdminRoutes);
+app.use("/api/admin", cors(corsOptionsAdmin), orderAdminRoutes);
 
 // ADMIN routes
 app.use("/api/client", cors(corsOptionsClient), productClientRoutes);

@@ -14,12 +14,15 @@ class ClientOrderController {
       const customerId = customerResult.rows[0].customer_id;
 
       const orderResult = await pool.query(
-        "INSERT INTO orders (customer_id, status) VALUES ($1, 'новий') RETURNING order_id",
+        "INSERT INTO orders (customer_id, status) VALUES ($1, 'new') RETURNING order_id",
         [customerId]
       );
       const orderId = orderResult.rows[0].order_id;
 
+      let totalCost = 0;
       for (const item of items) {
+        const itemCost = item.price * item.quantity;
+        totalCost += itemCost;
         await pool.query(
           "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)",
           [orderId, item.product_id, item.quantity, item.price]
@@ -37,7 +40,8 @@ class ClientOrderController {
                     'title', p.title,
                     'quantity', oi.quantity,
                     'price', oi.price
-                  )) AS items
+                  )) AS items,
+                  ${totalCost} AS total_cost
            FROM orders o
            JOIN customers c ON o.customer_id = c.customer_id
            JOIN order_items oi ON o.order_id = oi.order_id
@@ -48,15 +52,18 @@ class ClientOrderController {
         );
 
         const orderData = orderDetails.rows[0];
+        orderData.total_cost = totalCost;
 
         io.emit("newOrder", orderData);
       } else {
         console.error("❌ WebSocket-сервер (io) не знайдено");
       }
 
-      res
-        .status(201)
-        .json({ message: "Order created successfully", orderId: orderId });
+      res.status(201).json({
+        message: "Order created successfully",
+        orderId: orderId,
+        totalCost: totalCost,
+      });
     } catch (error) {
       await pool.query("ROLLBACK");
       res

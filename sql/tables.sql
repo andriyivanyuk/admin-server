@@ -78,4 +78,6 @@ CREATE TABLE Order_Items (
     price DECIMAL NOT NULL
 );
 
+-- TRUNCATE TABLE orders RESTART IDENTITY CASCADE; clear data from table but table
+
 
