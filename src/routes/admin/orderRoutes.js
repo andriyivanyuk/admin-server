@@ -10,4 +10,10 @@ router.get(
   orderAdminController.getOrderDetails
 );
 
+router.put(
+  "/order/:orderId/status",
+  authenticate,
+  orderAdminController.updateOrderStatus
+);
+
 module.exports = router;

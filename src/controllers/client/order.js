@@ -13,9 +13,20 @@ class ClientOrderController {
       );
       const customerId = customerResult.rows[0].customer_id;
 
+      const statusResult = await pool.query(
+        "SELECT status_id FROM OrderStatuses WHERE status_name = 'Новий'"
+      );
+      if (statusResult.rows.length === 0) {
+        res
+          .status(500)
+          .json({ message: "Статус 'Новий' не знайдено в базі даних." });
+        return;
+      }
+      const statusId = statusResult.rows[0].status_id;
+
       const orderResult = await pool.query(
-        "INSERT INTO orders (customer_id, status) VALUES ($1, 'new') RETURNING order_id",
-        [customerId]
+        "INSERT INTO orders (customer_id, status_id) VALUES ($1, $2) RETURNING order_id",
+        [customerId, statusId]
       );
       const orderId = orderResult.rows[0].order_id;
 
@@ -34,7 +45,7 @@ class ClientOrderController {
       const io = req.app.get("io");
       if (io) {
         const orderDetails = await pool.query(
-          `SELECT o.order_id, o.status, c.email, c.phone, c.title AS customer_name, 
+          `SELECT o.order_id, os.status_name AS status, c.email, c.phone, c.title AS customer_name, 
                   json_agg(json_build_object(
                     'product_id', p.product_id,
                     'title', p.title,
@@ -46,8 +57,9 @@ class ClientOrderController {
            JOIN customers c ON o.customer_id = c.customer_id
            JOIN order_items oi ON o.order_id = oi.order_id
            JOIN products p ON oi.product_id = p.product_id
+           JOIN OrderStatuses os ON o.status_id = os.status_id
            WHERE o.order_id = $1
-           GROUP BY o.order_id, c.email, c.phone, c.title`,
+           GROUP BY o.order_id, os.status_name, c.email, c.phone, c.title`,
           [orderId]
         );
 

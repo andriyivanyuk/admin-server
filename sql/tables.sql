@@ -67,8 +67,22 @@ CREATE TABLE Orders (
     order_id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL REFERENCES Customers(customer_id) ON DELETE CASCADE,
     order_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    status VARCHAR(255) NOT NULL
+    status_id INTEGER NOT NULL REFERENCES OrderStatuses(status_id) ON DELETE SET NULL,
 );
+
+CREATE TABLE OrderStatuses (
+    status_id SERIAL PRIMARY KEY,
+    status_name VARCHAR(255) NOT NULL
+);
+
+-- Додавання статусів замовлень
+INSERT INTO OrderStatuses (status_name) VALUES 
+('Новий'), 
+('В обробці'), 
+('Готове до відправки'), 
+('Відправлено'), 
+('Доставлено'), 
+('Скасовано');
 
 CREATE TABLE Order_Items (
     order_item_id SERIAL PRIMARY KEY,
