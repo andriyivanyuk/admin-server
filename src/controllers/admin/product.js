@@ -13,24 +13,25 @@ class AdminProductsController {
 
     try {
       const countQuery = `
-      SELECT COUNT(*) AS total FROM products WHERE lower(title) LIKE lower($1)
-    `;
+        SELECT COUNT(*) AS total FROM products WHERE lower(title) LIKE lower($1)
+      `;
       const countResult = await pool.query(countQuery, [`%${search}%`]);
       const totalProducts = parseInt(countResult.rows[0].total);
 
-      // Вибираємо продукти з бази
       const productQuery = `
-      SELECT p.*, s.status_name, json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
-      json_agg(json_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) FILTER (WHERE pi.image_id IS NOT NULL) AS images
-      FROM products p
-      JOIN statuses s ON p.status_id = s.status_id
-      LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
-      LEFT JOIN product_images pi ON p.product_id = pi.product_id
-      WHERE lower(p.title) LIKE lower($1)
-      GROUP BY p.product_id, s.status_name
-      ORDER BY p.product_id
-      LIMIT $2 OFFSET $3
-    `;
+        SELECT p.product_id, p.title, p.description, p.price, p.stock, s.status_name, c.title AS category_title,
+               json_agg(DISTINCT jsonb_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) AS attributes,
+               json_agg(DISTINCT jsonb_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) AS images
+        FROM products p
+        JOIN statuses s ON p.status_id = s.status_id
+        JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
+        LEFT JOIN product_images pi ON p.product_id = pi.product_id
+        WHERE lower(p.title) LIKE lower($1)
+        GROUP BY p.product_id, s.status_name, c.title
+        ORDER BY p.product_id
+        LIMIT $2 OFFSET $3
+      `;
       const result = await pool.query(productQuery, [
         `%${search}%`,
         limit,
@@ -48,21 +49,19 @@ class AdminProductsController {
   async getProductById(req, res) {
     const { id } = req.params;
     try {
-      const product = await pool.query(
-        `SELECT p.*, s.status_name, c.title as category_title,
-            (SELECT json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) 
-                FROM product_attributes pa WHERE pa.product_id = p.product_id) AS attributes,
-            
-            (SELECT json_agg(json_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) 
-                FROM product_images pi WHERE pi.product_id = p.product_id) AS images
-            
-            FROM products p
-            JOIN statuses s ON p.status_id = s.status_id
-            JOIN categories c ON p.category_id = c.category_id
-            WHERE p.product_id = $1
-            GROUP BY p.product_id, s.status_name, c.title`,
-        [id]
-      );
+      const productQuery = `
+        SELECT p.*, s.status_name, c.title as category_title,
+            json_agg(DISTINCT jsonb_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) AS attributes,
+            json_agg(DISTINCT jsonb_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) AS images
+        FROM products p
+        JOIN statuses s ON p.status_id = s.status_id
+        JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN product_attributes pa ON p.product_id = p.product_id
+        LEFT JOIN product_images pi ON p.product_id = p.product_id
+        WHERE p.product_id = $1
+        GROUP BY p.product_id, s.status_name, c.title
+      `;
+      const product = await pool.query(productQuery, [id]);
 
       if (product.rows.length === 0) {
         return res.status(404).json({ message: "Product not found" });
@@ -169,16 +168,29 @@ class AdminProductsController {
         [product_id]
       );
 
-      // await pool.query(`DELETE FROM product_attributes WHERE product_id = $1`, [
-      //   product_id,
-      // ]);
+      // if (attributes && attributes.length > 0) {
+      //   for (const attr of attributes) {
+      //     await pool.query(
+      //       `INSERT INTO product_attributes (product_id, attribute_key, attribute_value)
+      //        VALUES ($1, $2, $3)`,
+      //       [product_id, attr.key, attr.value]
+      //     );
+      //   }
+      // }
+      // Оновлення атрибутів з UPSERT
       if (attributes && attributes.length > 0) {
+        const attributeUpsertQuery = `
+          INSERT INTO product_attributes (product_id, attribute_key, attribute_value)
+          VALUES ($1, $2, $3)
+          ON CONFLICT (product_id, attribute_key)
+          DO UPDATE SET attribute_value = EXCLUDED.attribute_value;
+        `;
         for (const attr of attributes) {
-          await pool.query(
-            `INSERT INTO product_attributes (product_id, attribute_key, attribute_value)
-             VALUES ($1, $2, $3)`,
-            [product_id, attr.key, attr.value]
-          );
+          await pool.query(attributeUpsertQuery, [
+            product_id,
+            attr.key,
+            attr.value,
+          ]);
         }
       }
 
@@ -202,18 +214,26 @@ class AdminProductsController {
       }
 
       const updatedProduct = await pool.query(
-        `SELECT p.*, s.status_name, c.title as category_title,
-            (SELECT json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) 
-                FROM product_attributes pa WHERE pa.product_id = p.product_id) AS attributes,
-            
-            (SELECT json_agg(json_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) 
-                FROM product_images pi WHERE pi.product_id = p.product_id) AS images
-            
-            FROM products p
-            JOIN statuses s ON p.status_id = s.status_id
-            JOIN categories c ON p.category_id = c.category_id
-            WHERE p.product_id = $1
-            GROUP BY p.product_id, s.status_name, c.title`,
+        `SELECT 
+           p.*, 
+           s.status_name, 
+           c.title as category_title,
+           json_agg(DISTINCT jsonb_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) FILTER (WHERE pa.attribute_id IS NOT NULL) AS attributes,
+           json_agg(DISTINCT jsonb_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) FILTER (WHERE pi.image_id IS NOT NULL) AS images
+           FROM 
+             products p
+           JOIN 
+             statuses s ON p.status_id = s.status_id
+           JOIN 
+             categories c ON p.category_id = c.category_id
+           LEFT JOIN 
+             product_attributes pa ON p.product_id = pa.product_id
+           LEFT JOIN 
+             product_images pi ON p.product_id = pi.product_id
+           WHERE 
+             p.product_id = $1
+           GROUP BY 
+             p.product_id, s.status_name, c.title`,
         [product_id]
       );
 
@@ -253,7 +273,13 @@ class AdminProductsController {
       );
 
       images.rows.forEach((image) => {
-        const imagePath = path.join(__dirname, "..", "..", image.image_path);
+        const imagePath = path.join(
+          __dirname,
+          "..",
+          "..",
+          "..",
+          image.image_path
+        );
         fs.unlink(imagePath, (err) => {
           if (err) console.error("Failed to delete image:", err);
         });

@@ -55,6 +55,8 @@ CREATE TABLE Product_Images (
     UNIQUE (product_id, image_path)
 );  
 
+CREATE UNIQUE INDEX idx_product_attribute_unique ON Product_Attributes (product_id, attribute_key)
+
 
 CREATE TABLE Customers (
     customer_id SERIAL PRIMARY KEY,
@@ -75,7 +77,7 @@ CREATE TABLE OrderStatuses (
     status_name VARCHAR(255) NOT NULL
 );
 
--- Додавання статусів замовлень
+
 INSERT INTO OrderStatuses (status_name) VALUES 
 ('Новий'), 
 ('В обробці'), 
