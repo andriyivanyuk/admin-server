@@ -48,7 +48,8 @@ class AuthController {
       res.status(201).json({
         user: user.username,
         email: user.email,
-        status: "pending_verification",
+        status:
+          "В процесі верифікації. Перевірте будь ласка Вашу електронну пошту",
       });
     } catch (error) {
       res
@@ -126,6 +127,15 @@ class AuthController {
       const user = result.rows[0];
       if (!user) {
         return res.status(404).send("Користувача не знайдено");
+      }
+
+      // Додати перевірку чи користувач верифікований
+      if (!user.is_verified) {
+        return res
+          .status(403)
+          .send(
+            "Ваш акаунт не верифіковано. Будь ласка, перейдіть по посиланню відправленому на вашу електронну пошту для завершення реєстрації."
+          );
       }
 
       const isPasswordValid = await bcrypt.compare(

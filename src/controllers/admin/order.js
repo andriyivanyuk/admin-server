@@ -114,7 +114,7 @@ class ClientOrderController {
 
         if (orderData.rows.length > 0) {
           const order = orderData.rows[0];
-          const emailBody = `<p>Ваше замовлення №${orderId} було оновлено до статусу "${order.status_name}".</p><p>Дякуємо, що вибрали нас!</p>`;
+          const emailBody = `<p>Ваше замовлення №${orderId} "${order.status_name}".</p><p>Дякуємо, що вибрали нас!</p>`;
 
           await this.sendEmail(
             order.email,
@@ -154,7 +154,7 @@ class ClientOrderController {
     });
 
     const mailOptions = {
-      from: `"Your Company Name" <${process.env.GMAIL_EMAIL}>`,
+      from: `"Digital Engineers" <${process.env.GMAIL_EMAIL}>`,
       to: to,
       subject: subject,
       html: htmlContent,

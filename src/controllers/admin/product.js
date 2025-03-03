@@ -251,11 +251,70 @@ class AdminProductsController {
     }
   }
 
+  // async deleteProduct(req, res) {
+  //   const { id } = req.params;
+  //   try {
+  //     await pool.query("BEGIN");
+
+  //     const images = await pool.query(
+  //       "SELECT image_path FROM product_images WHERE product_id = $1",
+  //       [id]
+  //     );
+
+  //     await pool.query("DELETE FROM product_images WHERE product_id = $1", [
+  //       id,
+  //     ]);
+  //     await pool.query("DELETE FROM product_attributes WHERE product_id = $1", [
+  //       id,
+  //     ]);
+  //     await pool.query(
+  //       "DELETE FROM products WHERE product_id = $1 RETURNING *",
+  //       [id]
+  //     );
+
+  //     images.rows.forEach((image) => {
+  //       const imagePath = path.join(
+  //         __dirname,
+  //         "..",
+  //         "..",
+  //         "..",
+  //         image.image_path
+  //       );
+  //       fs.unlink(imagePath, (err) => {
+  //         if (err) console.error("Failed to delete image:", err);
+  //       });
+  //     });
+
+  //     await pool.query("COMMIT");
+  //     res.json({ message: "Продукт видалено успішно" });
+  //   } catch (error) {
+  //     await pool.query("ROLLBACK");
+  //     res
+  //       .status(500)
+  //       .json({ message: "Internal server error", error: error.message });
+  //   }
+  // }
   async deleteProduct(req, res) {
     const { id } = req.params;
     try {
       await pool.query("BEGIN");
 
+      // Перевірка на наявність замовлень для цього продукту
+      const ordersCheck = await pool.query(
+        "SELECT 1 FROM order_items WHERE product_id = $1 LIMIT 1",
+        [id]
+      );
+
+      if (ordersCheck.rowCount > 0) {
+        await pool.query("ROLLBACK");
+        return res
+          .status(400)
+          .json({
+            message: "Продукт має активне замовлення і не може бути видалений.",
+          });
+      }
+
+      // Видалення зображень продукту
       const images = await pool.query(
         "SELECT image_path FROM product_images WHERE product_id = $1",
         [id]
@@ -272,6 +331,7 @@ class AdminProductsController {
         [id]
       );
 
+      // Видалення файлів зображень
       images.rows.forEach((image) => {
         const imagePath = path.join(
           __dirname,
@@ -289,6 +349,7 @@ class AdminProductsController {
       res.json({ message: "Продукт видалено успішно" });
     } catch (error) {
       await pool.query("ROLLBACK");
+      console.error("Error during product deletion:", error);
       res
         .status(500)
         .json({ message: "Internal server error", error: error.message });

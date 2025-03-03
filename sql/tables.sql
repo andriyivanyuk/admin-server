@@ -86,13 +86,24 @@ INSERT INTO OrderStatuses (status_name) VALUES
 ('Доставлено'), 
 ('Скасовано');
 
-CREATE TABLE Order_Items (
+-- CREATE TABLE Order_Items (
+--     order_item_id SERIAL PRIMARY KEY,
+--     order_id INTEGER NOT NULL REFERENCES Orders(order_id) ON DELETE CASCADE,
+--     product_id INTEGER NOT NULL REFERENCES Products(product_id) ON DELETE CASCADE,
+--     quantity INTEGER NOT NULL CHECK (quantity > 0),
+--     price DECIMAL NOT NULL,
+--     FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT
+-- );
+CREATE TABLE order_items (
     order_item_id SERIAL PRIMARY KEY,
-    order_id INTEGER NOT NULL REFERENCES Orders(order_id) ON DELETE CASCADE,
-    product_id INTEGER NOT NULL REFERENCES Products(product_id) ON DELETE CASCADE,
-    quantity INTEGER NOT NULL CHECK (quantity > 0),
-    price DECIMAL NOT NULL
+    order_id INTEGER NOT NULL,
+    product_id INTEGER NOT NULL,
+    quantity INTEGER NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE RESTRICT
 );
+
 
 -- TRUNCATE TABLE orders RESTART IDENTITY CASCADE; clear data from table but table
 
