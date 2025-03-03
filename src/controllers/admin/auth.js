@@ -43,7 +43,7 @@ class AuthController {
       const user = result.rows[0];
       await this.sendVerificationEmail(
         email,
-        `http://localhost:4200/auth/verify/${verificationToken}`
+        `http://localhost:4200/authentication/verify/${verificationToken}`
       );
       res.status(201).json({
         user: user.username,
@@ -72,17 +72,20 @@ class AuthController {
     });
 
     const mailOptions = {
-      from: `"Your Service Name" <${process.env.GMAIL_EMAIL}>`,
+      from: `"Digital engineers panel" <${process.env.GMAIL_EMAIL}>`,
       to: userEmail,
-      subject: "Please confirm your email",
-      html: `<b>Click here to confirm your email:</b> <a href="${verificationLink}">Confirm Email</a>`,
+      subject: "Будь ласка підтвердіть Ваш email",
+      html: `<b>Натисніть, щоб підтвердити Ваш Email:</b> <a href="${verificationLink}">Підтвердити Email</a>`,
     };
 
     try {
       const result = await transporter.sendMail(mailOptions);
-      console.log("Verification email sent: %s", result.messageId);
+      console.log("Email верифікації надіслано: %s", result.messageId);
     } catch (error) {
-      console.error("Failed to send verification email: ", error);
+      console.error(
+        "Не вдалося надіслати електронний лист для підтвердження: ",
+        error
+      );
     }
   };
 
@@ -97,7 +100,7 @@ class AuthController {
       if (user.rows.length === 0) {
         return res
           .status(400)
-          .json({ message: "Token is invalid or has expired." });
+          .json({ message: "Токен не валідний або закінчився" });
       }
 
       await pool.query(
@@ -105,11 +108,11 @@ class AuthController {
         [user.rows[0].user_id]
       );
 
-      res.status(200).json({ message: "Email verified successfully!" });
+      res.status(200).json({ message: "Email верифіковано успішно!" });
     } catch (error) {
       res
         .status(500)
-        .json({ message: "Error verifying email: " + error.message });
+        .json({ message: "Помилка верифікації email: " + error.message });
     }
   };
 
@@ -122,7 +125,7 @@ class AuthController {
 
       const user = result.rows[0];
       if (!user) {
-        return res.status(404).send("User not found");
+        return res.status(404).send("Користувача не знайдено");
       }
 
       const isPasswordValid = await bcrypt.compare(
@@ -130,7 +133,7 @@ class AuthController {
         user.password_hash
       );
       if (!isPasswordValid) {
-        return res.status(401).send("Invalid password");
+        return res.status(401).send("Невірний пароль");
       }
 
       const token = jwt.sign({ id: user.user_id }, process.env.SECRET_KEY, {
@@ -138,7 +141,7 @@ class AuthController {
       });
       res.send({ user, token });
     } catch (error) {
-      res.status(500).send("Error during login: " + error.message);
+      res.status(500).send("Помилка підчас логіну: " + error.message);
     }
   };
 }

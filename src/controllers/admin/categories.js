@@ -10,6 +10,7 @@ class CategoriesController {
       );
       res.status(201).json(result.rows[0]);
     } catch (error) {
+      console.error("Error creating category:", error);
       res
         .status(500)
         .json({ message: "Error creating category: " + error.message });
@@ -21,6 +22,7 @@ class CategoriesController {
       const result = await pool.query("SELECT * FROM categories");
       res.status(200).json(result.rows);
     } catch (error) {
+      console.error("Error retrieving categories:", error);
       res
         .status(500)
         .json({ message: "Error retrieving categories: " + error.message });
@@ -39,6 +41,7 @@ class CategoriesController {
       }
       res.status(200).json(result.rows[0]);
     } catch (error) {
+      console.error("Error retrieving category:", error);
       res
         .status(500)
         .json({ message: "Error retrieving category: " + error.message });
@@ -49,15 +52,21 @@ class CategoriesController {
     const { id } = req.params;
     const { title, description } = req.body;
     try {
+      const check = await pool.query(
+        "SELECT * FROM categories WHERE category_id = $1",
+        [id]
+      );
+      if (check.rows.length === 0) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+
       const result = await pool.query(
         "UPDATE categories SET title = $1, description = $2 WHERE category_id = $3 RETURNING *",
         [title, description, id]
       );
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Category not found" });
-      }
       res.status(200).json(result.rows[0]);
     } catch (error) {
+      console.error("Error updating category:", error);
       res
         .status(500)
         .json({ message: "Error updating category: " + error.message });
@@ -67,15 +76,24 @@ class CategoriesController {
   async deleteCategory(req, res) {
     const { id } = req.params;
     try {
+      const check = await pool.query(
+        "SELECT * FROM categories WHERE category_id = $1",
+        [id]
+      );
+      if (check.rows.length === 0) {
+        return res.status(404).json({ message: "Category not found" });
+      }
+
       const result = await pool.query(
         "DELETE FROM categories WHERE category_id = $1 RETURNING *",
         [id]
       );
-      if (result.rows.length === 0) {
-        return res.status(404).json({ message: "Category not found" });
-      }
-      res.status(200).json({ message: "Category deleted successfully" });
+      res.status(200).json({
+        message: "Category deleted successfully",
+        deletedCategory: result.rows[0],
+      });
     } catch (error) {
+      console.error("Error deleting category:", error);
       res
         .status(500)
         .json({ message: "Error deleting category: " + error.message });
