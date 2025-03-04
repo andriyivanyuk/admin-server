@@ -99,7 +99,7 @@ class AdminProductsController {
 
       const productId = productResult.rows[0].product_id;
 
-      if (attributes) {
+      if (attributes && attributes.length > 0) {
         for (const attr of attributes) {
           await pool.query(
             `INSERT INTO product_attributes (product_id, attribute_key, attribute_value)
@@ -168,15 +168,6 @@ class AdminProductsController {
         [product_id]
       );
 
-      // if (attributes && attributes.length > 0) {
-      //   for (const attr of attributes) {
-      //     await pool.query(
-      //       `INSERT INTO product_attributes (product_id, attribute_key, attribute_value)
-      //        VALUES ($1, $2, $3)`,
-      //       [product_id, attr.key, attr.value]
-      //     );
-      //   }
-      // }
       // Оновлення атрибутів з UPSERT
       if (attributes && attributes.length > 0) {
         const attributeUpsertQuery = `
@@ -251,49 +242,6 @@ class AdminProductsController {
     }
   }
 
-  // async deleteProduct(req, res) {
-  //   const { id } = req.params;
-  //   try {
-  //     await pool.query("BEGIN");
-
-  //     const images = await pool.query(
-  //       "SELECT image_path FROM product_images WHERE product_id = $1",
-  //       [id]
-  //     );
-
-  //     await pool.query("DELETE FROM product_images WHERE product_id = $1", [
-  //       id,
-  //     ]);
-  //     await pool.query("DELETE FROM product_attributes WHERE product_id = $1", [
-  //       id,
-  //     ]);
-  //     await pool.query(
-  //       "DELETE FROM products WHERE product_id = $1 RETURNING *",
-  //       [id]
-  //     );
-
-  //     images.rows.forEach((image) => {
-  //       const imagePath = path.join(
-  //         __dirname,
-  //         "..",
-  //         "..",
-  //         "..",
-  //         image.image_path
-  //       );
-  //       fs.unlink(imagePath, (err) => {
-  //         if (err) console.error("Failed to delete image:", err);
-  //       });
-  //     });
-
-  //     await pool.query("COMMIT");
-  //     res.json({ message: "Продукт видалено успішно" });
-  //   } catch (error) {
-  //     await pool.query("ROLLBACK");
-  //     res
-  //       .status(500)
-  //       .json({ message: "Internal server error", error: error.message });
-  //   }
-  // }
   async deleteProduct(req, res) {
     const { id } = req.params;
     try {
@@ -307,11 +255,9 @@ class AdminProductsController {
 
       if (ordersCheck.rowCount > 0) {
         await pool.query("ROLLBACK");
-        return res
-          .status(400)
-          .json({
-            message: "Продукт має активне замовлення і не може бути видалений.",
-          });
+        return res.status(400).json({
+          message: "Продукт має активне замовлення і не може бути видалений.",
+        });
       }
 
       // Видалення зображень продукту
