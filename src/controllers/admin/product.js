@@ -163,7 +163,7 @@ class AdminProductsController {
     }
   }
 
-  async updateProduct(req, res) {
+  updateProduct = async (req, res) => {
     const {
       product_id,
       title,
@@ -198,7 +198,12 @@ class AdminProductsController {
         [product_id]
       );
 
-      if (!attributes) {
+      if (attributes) {
+        const parsedAttributes = JSON.parse(attributes);
+        if (parsedAttributes && parsedAttributes.length > 0) {
+          await this.updateProductAttributes(product_id, parsedAttributes);
+        }
+      } else {
         await pool.query(
           "DELETE FROM attribute_values WHERE attribute_id IN (SELECT attribute_id FROM product_attributes WHERE product_id = $1)",
           [product_id]
@@ -207,27 +212,8 @@ class AdminProductsController {
           "DELETE FROM product_attributes WHERE product_id = $1",
           [product_id]
         );
-      } else {
-        const parsedAttributes = JSON.parse(attributes);
-        if (parsedAttributes.length) {
-          for (const attr of parsedAttributes) {
-            const attributeResult = await pool.query(
-              `INSERT INTO product_attributes (product_id, attribute_key)
-                    VALUES ($1, $2) RETURNING attribute_id`,
-              [product_id, attr.key]
-            );
-            const attributeId = attributeResult.rows[0].attribute_id;
-
-            for (const value of attr.values) {
-              await pool.query(
-                `INSERT INTO attribute_values (attribute_id, value)
-                        VALUES ($1, $2)`,
-                [attributeId, value]
-              );
-            }
-          }
-        }
       }
+
       await pool.query("COMMIT");
 
       const defaultImages = await imageService.getImagesByProductId(product_id);
@@ -287,7 +273,7 @@ class AdminProductsController {
         .status(500)
         .json({ message: "Internal server error", error: error.message });
     }
-  }
+  };
 
   async deleteProduct(req, res) {
     const { id } = req.params;
@@ -345,6 +331,46 @@ class AdminProductsController {
         .json({ message: "Internal server error", error: error.message });
     }
   }
+
+  updateProductAttributes = async (productId, parsedAttributes) => {
+    const existingAttrs = await pool.query(
+      "SELECT attribute_id, attribute_key FROM product_attributes WHERE product_id = $1",
+      [productId]
+    );
+    const existingAttrMap = new Map(
+      existingAttrs.rows.map((attr) => [attr.attribute_key, attr.attribute_id])
+    );
+
+    for (const attr of parsedAttributes) {
+      if (attr.key && attr.values && attr.values.length > 0) {
+        if (existingAttrMap.has(attr.key)) {
+          const attributeId = existingAttrMap.get(attr.key);
+          await pool.query(
+            "DELETE FROM attribute_values WHERE attribute_id = $1",
+            [attributeId]
+          );
+          for (const value of attr.values) {
+            await pool.query(
+              "INSERT INTO attribute_values (attribute_id, value) VALUES ($1, $2)",
+              [attributeId, value]
+            );
+          }
+        } else {
+          const attributeResult = await pool.query(
+            "INSERT INTO product_attributes (product_id, attribute_key) VALUES ($1, $2) RETURNING attribute_id",
+            [productId, attr.key]
+          );
+          const newAttributeId = attributeResult.rows[0].attribute_id;
+          for (const value of attr.values) {
+            await pool.query(
+              "INSERT INTO attribute_values (attribute_id, value) VALUES ($1, $2)",
+              [newAttributeId, value]
+            );
+          }
+        }
+      }
+    }
+  };
 }
 
 module.exports = new AdminProductsController();
