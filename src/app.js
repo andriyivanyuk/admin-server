@@ -52,7 +52,7 @@ app.use("/api/admin", cors(corsOptionsAdmin), productAdminRoutes);
 app.use("/api/admin", cors(corsOptionsAdmin), orderRoutes);
 app.use("/api/admin", cors(corsOptionsAdmin), orderStatusesAdminRoutes);
 
-// ADMIN routes
+// Client routes
 app.use("/api/client", cors(corsOptionsClient), productClientRoutes);
 app.use("/api/client", cors(corsOptionsClient), orderClientRoutes);
 

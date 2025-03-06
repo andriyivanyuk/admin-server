@@ -41,7 +41,15 @@ CREATE TABLE Product_Attributes (
     attribute_id SERIAL PRIMARY KEY,
     product_id INTEGER NOT NULL REFERENCES Products(product_id) ON DELETE CASCADE,
     attribute_key VARCHAR(255) NOT NULL,
-    attribute_value TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE Attribute_Values (
+    value_id SERIAL PRIMARY KEY,
+    attribute_id INTEGER NOT NULL REFERENCES Product_Attributes(attribute_id) ON DELETE CASCADE,
+    value TEXT NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -86,14 +94,7 @@ INSERT INTO OrderStatuses (status_name) VALUES
 ('Доставлено'), 
 ('Скасовано');
 
--- CREATE TABLE Order_Items (
---     order_item_id SERIAL PRIMARY KEY,
---     order_id INTEGER NOT NULL REFERENCES Orders(order_id) ON DELETE CASCADE,
---     product_id INTEGER NOT NULL REFERENCES Products(product_id) ON DELETE CASCADE,
---     quantity INTEGER NOT NULL CHECK (quantity > 0),
---     price DECIMAL NOT NULL,
---     FOREIGN KEY (product_id) REFERENCES Products(product_id) ON DELETE RESTRICT
--- );
+
 CREATE TABLE order_items (
     order_item_id SERIAL PRIMARY KEY,
     order_id INTEGER NOT NULL,

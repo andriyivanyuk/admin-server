@@ -129,7 +129,6 @@ class AuthController {
         return res.status(404).send("Користувача не знайдено");
       }
 
-      // Додати перевірку чи користувач верифікований
       if (!user.is_verified) {
         return res
           .status(403)
@@ -147,7 +146,7 @@ class AuthController {
       }
 
       const token = jwt.sign({ id: user.user_id }, process.env.SECRET_KEY, {
-        expiresIn: "3h",
+        expiresIn: "1d",
       });
       res.send({ user, token });
     } catch (error) {
