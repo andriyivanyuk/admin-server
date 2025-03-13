@@ -119,6 +119,7 @@ class AuthController {
 
   login = async (req, res) => {
     const { email, password } = req.body;
+    
     try {
       const result = await pool.query("SELECT * FROM users WHERE email = $1", [
         email,

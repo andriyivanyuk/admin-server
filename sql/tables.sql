@@ -32,7 +32,7 @@ CREATE TABLE Products (
     stock INTEGER NOT NULL,
     category_id INTEGER NOT NULL REFERENCES Categories(category_id) ON DELETE CASCADE,
     created_by_user_id INTEGER NOT NULL REFERENCES Users(user_id) ON DELETE CASCADE,
-    status_id INTEGER NOT NULL REFERENCES Statuses(status_id) ON DELETE SET NULL,
+    status_id INTEGER REFERENCES Statuses(status_id) ON DELETE SET NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -77,7 +77,7 @@ CREATE TABLE Orders (
     order_id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL REFERENCES Customers(customer_id) ON DELETE CASCADE,
     order_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    status_id INTEGER NOT NULL REFERENCES OrderStatuses(status_id) ON DELETE SET NULL,
+    status_id INTEGER NOT NULL REFERENCES OrderStatuses(status_id) ON DELETE SET NULL
 );
 
 CREATE TABLE OrderStatuses (

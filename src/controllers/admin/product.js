@@ -19,21 +19,17 @@ class AdminProductsController {
       const totalProducts = parseInt(countResult.rows[0].total);
 
       const productQuery = `
-        SELECT p.product_id, p.title, p.description, p.price, p.stock, s.status_name, c.title AS category_title,
-       json_agg(jsonb_build_object('key', pa.attribute_key, 'values', av.values)) AS attributes,
-       json_agg(jsonb_build_object('image_path', pi.image_path, 'is_primary', pi.is_primary)) AS images
-       FROM products p
-       JOIN statuses s ON p.status_id = s.status_id
-       JOIN categories c ON p.category_id = c.category_id
-       LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
-       LEFT JOIN (
-       SELECT attribute_id, json_agg(value) AS values
-       FROM attribute_values
-       GROUP BY attribute_id
-       ) av ON pa.attribute_id = av.attribute_id
-       LEFT JOIN product_images pi ON p.product_id = pi.product_id
-      WHERE lower(p.title) LIKE lower($1)
-      GROUP BY p.product_id, s.status_name, c.title
+       SELECT 
+       p.product_id, 
+       p.title, 
+       p.price, 
+       p.stock, 
+       s.status_name AS status,
+       pi.image_path
+      FROM products p
+      JOIN statuses s ON p.status_id = s.status_id
+      LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_primary = true
+      WHERE p.title ILIKE $1
       ORDER BY p.product_id
       LIMIT $2 OFFSET $3
       `;
@@ -107,7 +103,7 @@ class AdminProductsController {
     const { title, description, price, stock, category_id, status_id } =
       req.body;
     const images = req.files;
-    const attributes = JSON.parse(req.body.attributes);
+    
 
     try {
       await pool.query("BEGIN");
@@ -119,8 +115,9 @@ class AdminProductsController {
       );
 
       const productId = productResult.rows[0].product_id;
-
-      if (attributes) {
+     
+      if (req.body.attributes) {
+        const attributes = JSON.parse(req.body.attributes);
         for (const attr of attributes) {
           const attributeResult = await pool.query(
             `INSERT INTO product_attributes (product_id, attribute_key)

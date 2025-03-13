@@ -25,7 +25,7 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 
 const corsOptionsAdmin = {
-  origin: "http://localhost:4200",
+  origin: ['http://localhost:4700', 'http://localhost:4200'],
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   allowedHeaders: "Content-Type,Authorization",
   optionsSuccessStatus: 200,
@@ -61,7 +61,7 @@ const server = http.createServer(app);
 // Налаштування CORS для Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:4200",
+    origin: "http://localhost:4700",
     methods: ["GET", "POST"],
     allowedHeaders: ["Authorization"],
   },
