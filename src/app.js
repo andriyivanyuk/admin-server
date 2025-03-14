@@ -15,6 +15,8 @@ const orderRoutes = require("./routes/admin/orderRoutes");
 const productAdminRoutes = require("./routes/admin/productRoutes");
 const orderStatusesAdminRoutes = require("./routes/admin/orderStatusRoutes");
 
+const superRoutes = require("./routes/admin/superAdminRoutes");
+
 //Client routes
 const productClientRoutes = require("./routes/client/productRoutes");
 const orderClientRoutes = require("./routes/client/orderRoutes");
@@ -24,8 +26,15 @@ const SECRET_KEY = process.env.SECRET_KEY;
 const PORT = process.env.PORT || 3000;
 const app = express();
 
+const corsOptionsSuperAdmin = {
+  origin: ["http://localhost:4200"],
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  allowedHeaders: "Content-Type,Authorization",
+  optionsSuccessStatus: 200,
+};
+
 const corsOptionsAdmin = {
-  origin: ['http://localhost:4700', 'http://localhost:4200'],
+  origin: ["http://localhost:4700", "http://localhost:4200"],
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   allowedHeaders: "Content-Type,Authorization",
   optionsSuccessStatus: 200,
@@ -39,6 +48,9 @@ const corsOptionsClient = {
 
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
+
+// SUPER ADMIN routes
+app.use("/api/super", cors(corsOptionsSuperAdmin), superRoutes);
 
 // ADMIN routes
 app.use("/api/auth/admin", cors(corsOptionsAdmin), authRoutes);

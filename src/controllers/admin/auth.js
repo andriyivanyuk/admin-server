@@ -20,8 +20,56 @@ oauth2Client.setCredentials({
 
 class AuthController {
   register = async (req, res) => {
-    const { username, password, email } = req.body;
+    // const { username, password, email } = req.body;
+    // try {
+    //   const existingUser = await pool.query(
+    //     "SELECT * FROM users WHERE email = $1",
+    //     [email]
+    //   );
+    //   if (existingUser.rows.length > 0) {
+    //     return res.status(400).json({ message: "Email already in use." });
+    //   }
+
+    //   const hashedPassword = await bcrypt.hash(password, 8);
+    //   const verificationToken = crypto.randomBytes(20).toString("hex");
+    //   const tokenExpires = new Date();
+    //   tokenExpires.setHours(tokenExpires.getHours() + 1);
+
+    //   const result = await pool.query(
+    //     "INSERT INTO users (username, password_hash, email, is_verified, verification_token, token_expires) VALUES ($1, $2, $3, false, $4, $5) RETURNING *",
+    //     [username, hashedPassword, email, verificationToken, tokenExpires]
+    //   );
+
+    //   const user = result.rows[0];
+    //   await this.sendVerificationEmail(
+    //     email,
+    //     `http://localhost:4200/authentication/verify/${verificationToken}`
+    //   );
+    //   res.status(201).json({
+    //     user: user.username,
+    //     email: user.email,
+    //     status:
+    //       "В процесі верифікації. Перевірте будь ласка Вашу електронну пошту",
+    //   });
+    // } catch (error) {
+    //   res
+    //     .status(500)
+    //     .json({ message: "Error during registration: " + error.message });
+    // }
+    const { username, password, email, code } = req.body;
     try {
+      const codeResult = await pool.query(
+        `SELECT * FROM registration_codes
+         WHERE code = $1 AND is_used = false`,
+        [code]
+      );
+
+      if (codeResult.rows.length === 0) {
+        return res
+          .status(400)
+          .json({ message: "Невірний або прострочений код реєстрації." });
+      }
+
       const existingUser = await pool.query(
         "SELECT * FROM users WHERE email = $1",
         [email]
@@ -36,11 +84,18 @@ class AuthController {
       tokenExpires.setHours(tokenExpires.getHours() + 1);
 
       const result = await pool.query(
-        "INSERT INTO users (username, password_hash, email, is_verified, verification_token, token_expires) VALUES ($1, $2, $3, false, $4, $5) RETURNING *",
+        `INSERT INTO users (username, password_hash, email, is_verified, verification_token, token_expires, role)
+         VALUES ($1, $2, $3, false, $4, $5, 'client') RETURNING *`,
         [username, hashedPassword, email, verificationToken, tokenExpires]
       );
 
       const user = result.rows[0];
+
+      await pool.query(
+        "UPDATE registration_codes SET is_used = true WHERE code = $1",
+        [code]
+      );
+
       await this.sendVerificationEmail(
         email,
         `http://localhost:4200/authentication/verify/${verificationToken}`
@@ -49,7 +104,7 @@ class AuthController {
         user: user.username,
         email: user.email,
         status:
-          "В процесі верифікації. Перевірте будь ласка Вашу електронну пошту",
+          "В процесі верифікації. Перевірте, будь ласка, Вашу електронну пошту",
       });
     } catch (error) {
       res
@@ -118,13 +173,48 @@ class AuthController {
   };
 
   login = async (req, res) => {
+    // const { email, password } = req.body;
+
+    // try {
+    //   const result = await pool.query("SELECT * FROM users WHERE email = $1", [
+    //     email,
+    //   ]);
+
+    //   const user = result.rows[0];
+    //   if (!user) {
+    //     return res.status(404).send("Користувача не знайдено");
+    //   }
+
+    //   if (!user.is_verified) {
+    //     return res
+    //       .status(403)
+    //       .send(
+    //         "Ваш акаунт не верифіковано. Будь ласка, перейдіть по посиланню відправленому на вашу електронну пошту для завершення реєстрації."
+    //       );
+    //   }
+
+    //   const isPasswordValid = await bcrypt.compare(
+    //     password,
+    //     user.password_hash
+    //   );
+    //   if (!isPasswordValid) {
+    //     return res.status(401).send("Невірний пароль");
+    //   }
+
+    //   const token = jwt.sign({ id: user.user_id }, process.env.SECRET_KEY, {
+    //     expiresIn: "1d",
+    //   });
+    //   res.send({ user, token });
+    // } catch (error) {
+    //   res.status(500).send("Помилка підчас логіну: " + error.message);
+    // }
+
     const { email, password } = req.body;
-    
+
     try {
       const result = await pool.query("SELECT * FROM users WHERE email = $1", [
         email,
       ]);
-
       const user = result.rows[0];
       if (!user) {
         return res.status(404).send("Користувача не знайдено");
@@ -134,7 +224,7 @@ class AuthController {
         return res
           .status(403)
           .send(
-            "Ваш акаунт не верифіковано. Будь ласка, перейдіть по посиланню відправленому на вашу електронну пошту для завершення реєстрації."
+            "Ваш акаунт не верифіковано. Перевірте пошту для завершення реєстрації."
           );
       }
 
@@ -146,12 +236,16 @@ class AuthController {
         return res.status(401).send("Невірний пароль");
       }
 
-      const token = jwt.sign({ id: user.user_id }, process.env.SECRET_KEY, {
-        expiresIn: "1d",
-      });
+      const token = jwt.sign(
+        { id: user.user_id, role: user.role },
+        process.env.SECRET_KEY,
+        {
+          expiresIn: "1d",
+        }
+      );
       res.send({ user, token });
     } catch (error) {
-      res.status(500).send("Помилка підчас логіну: " + error.message);
+      res.status(500).send("Помилка під час логіну: " + error.message);
     }
   };
 }

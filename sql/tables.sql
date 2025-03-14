@@ -9,6 +9,12 @@ CREATE TABLE Users (
     token_expires TIMESTAMP
 );
 
+ALTER TABLE users
+ADD COLUMN role TEXT NOT NULL DEFAULT 'client';
+
+UPDATE users
+SET role = 'superadmin'
+WHERE email = 'andriyivvanyuk@gmail.com';
 
 CREATE TABLE Categories (
     category_id SERIAL PRIMARY KEY,
@@ -105,7 +111,14 @@ CREATE TABLE order_items (
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE RESTRICT
 );
 
-
+CREATE TABLE registration_codes (
+  code TEXT PRIMARY KEY,
+  is_used BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW(),
+  expires_at TIMESTAMP
+);
 -- TRUNCATE TABLE orders RESTART IDENTITY CASCADE; clear data from table but table
+-- DELETE FROM users
+-- WHERE role = 'client';
 
 
