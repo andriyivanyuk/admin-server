@@ -4,6 +4,13 @@ const registrationCodeController = require("../../controllers/admin/registration
 const requireSuperadmin = require("../../middlewares/requireSuperadmin");
 const authenticate = require("../../middlewares/authenticate");
 
+router.get(
+  "/registration-codes",
+  authenticate,
+  requireSuperadmin,
+  registrationCodeController.listCodes
+);
+
 router.post(
   "/registration-codes/generate",
   authenticate,
@@ -11,11 +18,11 @@ router.post(
   registrationCodeController.generateCode
 );
 
-router.get(
-  "/registration-codes",
+router.delete(
+  "/registration-codes/:code",
   authenticate,
   requireSuperadmin,
-  registrationCodeController.listCodes
+  registrationCodeController.deleteCode
 );
 
 module.exports = router;
