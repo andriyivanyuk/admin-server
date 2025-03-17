@@ -51,39 +51,39 @@ class AdminProductsController {
     const { id } = req.params;
     try {
       const productQuery = `
-            WITH attribute_details AS (
-                SELECT
-                    pa.product_id,
-                    pa.attribute_id,
-                    pa.attribute_key,
-                    json_agg(jsonb_build_object('value_id', av.value_id, 'value', av.value)) AS values
-                FROM product_attributes pa
-                LEFT JOIN attribute_values av ON pa.attribute_id = av.attribute_id
-                WHERE pa.product_id = $1
-                GROUP BY pa.product_id, pa.attribute_id, pa.attribute_key
-            )
-            SELECT 
-                p.product_id, 
-                p.title, 
-                p.description, 
-                p.price, 
-                p.stock, 
-                p.category_id, 
-                p.status_id, 
-                p.created_at, 
-                p.updated_at, 
-                s.status_name, 
-                c.title as category_title,
-                json_agg(jsonb_build_object('attribute_id', ad.attribute_id, 'key', ad.attribute_key, 'values', ad.values)) AS attributes,
-                json_agg(DISTINCT jsonb_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) AS images
-            FROM products p
-            JOIN statuses s ON p.status_id = s.status_id
-            JOIN categories c ON p.category_id = c.category_id
-            LEFT JOIN attribute_details ad ON p.product_id = ad.product_id
-            LEFT JOIN product_images pi ON p.product_id = pi.product_id
-            WHERE p.product_id = $1
-            GROUP BY p.product_id, s.status_id, c.category_id;
-        `;
+      WITH attribute_details AS (
+          SELECT
+              pa.product_id,
+              pa.attribute_id,
+              pa.attribute_key,
+              json_agg(jsonb_build_object('value_id', av.value_id, 'value', av.value)) AS values
+          FROM product_attributes pa
+          LEFT JOIN attribute_values av ON pa.attribute_id = av.attribute_id
+          WHERE pa.product_id = $1
+          GROUP BY pa.product_id, pa.attribute_id, pa.attribute_key
+      )
+      SELECT 
+          p.product_id, 
+          p.title, 
+          p.description, 
+          p.price, 
+          p.stock, 
+          p.category_id, 
+          p.status_id, 
+          p.created_at, 
+          p.updated_at, 
+          s.status_name, 
+          c.title as category_title,
+          json_agg(jsonb_build_object('attribute_id', ad.attribute_id, 'key', ad.attribute_key, 'values', ad.values)) AS attributes,
+          json_agg(DISTINCT jsonb_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) AS images
+      FROM products p
+      JOIN statuses s ON p.status_id = s.status_id
+      JOIN categories c ON p.category_id = c.category_id
+      LEFT JOIN attribute_details ad ON p.product_id = ad.product_id
+      LEFT JOIN product_images pi ON p.product_id = pi.product_id
+      WHERE p.product_id = $1
+      GROUP BY p.product_id, s.status_id, c.category_id;
+    `;
 
       const product = await pool.query(productQuery, [id]);
 
@@ -91,7 +91,18 @@ class AdminProductsController {
         return res.status(404).json({ message: "Product not found" });
       }
 
-      res.json(product.rows[0]);
+      const result = product.rows[0];
+
+      if (
+        !result.attributes ||
+        result.attributes.some(
+          (attr) => attr.key === null || attr.values === null
+        )
+      ) {
+        result.attributes = [];
+      }
+
+      res.json(result);
     } catch (error) {
       res
         .status(500)
@@ -103,7 +114,6 @@ class AdminProductsController {
     const { title, description, price, stock, category_id, status_id } =
       req.body;
     const images = req.files;
-    
 
     try {
       await pool.query("BEGIN");
@@ -115,7 +125,7 @@ class AdminProductsController {
       );
 
       const productId = productResult.rows[0].product_id;
-     
+
       if (req.body.attributes) {
         const attributes = JSON.parse(req.body.attributes);
         for (const attr of attributes) {
@@ -338,6 +348,25 @@ class AdminProductsController {
       existingAttrs.rows.map((attr) => [attr.attribute_key, attr.attribute_id])
     );
 
+    const newAttributeKeys = new Set(
+      parsedAttributes
+        .filter((attr) => attr.key && attr.values && attr.values.length > 0)
+        .map((attr) => attr.key)
+    );
+
+    for (const [key, attributeId] of existingAttrMap) {
+      if (!newAttributeKeys.has(key)) {
+        await pool.query(
+          "DELETE FROM attribute_values WHERE attribute_id = $1",
+          [attributeId]
+        );
+        await pool.query(
+          "DELETE FROM product_attributes WHERE attribute_id = $1",
+          [attributeId]
+        );
+      }
+    }
+
     for (const attr of parsedAttributes) {
       if (attr.key && attr.values && attr.values.length > 0) {
         if (existingAttrMap.has(attr.key)) {
@@ -346,6 +375,7 @@ class AdminProductsController {
             "DELETE FROM attribute_values WHERE attribute_id = $1",
             [attributeId]
           );
+
           for (const value of attr.values) {
             await pool.query(
               "INSERT INTO attribute_values (attribute_id, value) VALUES ($1, $2)",
