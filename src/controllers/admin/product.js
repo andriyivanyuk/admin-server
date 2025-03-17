@@ -51,39 +51,39 @@ class AdminProductsController {
     const { id } = req.params;
     try {
       const productQuery = `
-      WITH attribute_details AS (
-          SELECT
-              pa.product_id,
-              pa.attribute_id,
-              pa.attribute_key,
-              json_agg(jsonb_build_object('value_id', av.value_id, 'value', av.value)) AS values
-          FROM product_attributes pa
-          LEFT JOIN attribute_values av ON pa.attribute_id = av.attribute_id
-          WHERE pa.product_id = $1
-          GROUP BY pa.product_id, pa.attribute_id, pa.attribute_key
-      )
-      SELECT 
-          p.product_id, 
-          p.title, 
-          p.description, 
-          p.price, 
-          p.stock, 
-          p.category_id, 
-          p.status_id, 
-          p.created_at, 
-          p.updated_at, 
-          s.status_name, 
-          c.title as category_title,
-          json_agg(jsonb_build_object('attribute_id', ad.attribute_id, 'key', ad.attribute_key, 'values', ad.values)) AS attributes,
-          json_agg(DISTINCT jsonb_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) AS images
-      FROM products p
-      JOIN statuses s ON p.status_id = s.status_id
-      JOIN categories c ON p.category_id = c.category_id
-      LEFT JOIN attribute_details ad ON p.product_id = ad.product_id
-      LEFT JOIN product_images pi ON p.product_id = pi.product_id
-      WHERE p.product_id = $1
-      GROUP BY p.product_id, s.status_id, c.category_id;
-    `;
+        WITH attribute_details AS (
+            SELECT
+                pa.product_id,
+                pa.attribute_id,
+                pa.attribute_key,
+                json_agg(jsonb_build_object('value_id', av.value_id, 'value', av.value)) AS values
+            FROM product_attributes pa
+            LEFT JOIN attribute_values av ON pa.attribute_id = av.attribute_id
+            WHERE pa.product_id = $1
+            GROUP BY pa.product_id, pa.attribute_id, pa.attribute_key
+        )
+        SELECT 
+            p.product_id, 
+            p.title, 
+            p.description, 
+            p.price, 
+            p.stock, 
+            p.category_id, 
+            p.status_id, 
+            p.created_at, 
+            p.updated_at, 
+            s.status_name, 
+            c.title as category_title,
+            json_agg(DISTINCT jsonb_build_object('attribute_id', ad.attribute_id, 'key', ad.attribute_key, 'values', ad.values)) AS attributes,
+            json_agg(DISTINCT jsonb_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) AS images
+        FROM products p
+        JOIN statuses s ON p.status_id = s.status_id
+        JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN attribute_details ad ON p.product_id = ad.product_id
+        LEFT JOIN product_images pi ON p.product_id = pi.product_id
+        WHERE p.product_id = $1
+        GROUP BY p.product_id, s.status_id, c.category_id;
+      `;
 
       const product = await pool.query(productQuery, [id]);
 
