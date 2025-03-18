@@ -20,42 +20,6 @@ oauth2Client.setCredentials({
 
 class AuthController {
   register = async (req, res) => {
-    // const { username, password, email } = req.body;
-    // try {
-    //   const existingUser = await pool.query(
-    //     "SELECT * FROM users WHERE email = $1",
-    //     [email]
-    //   );
-    //   if (existingUser.rows.length > 0) {
-    //     return res.status(400).json({ message: "Email already in use." });
-    //   }
-
-    //   const hashedPassword = await bcrypt.hash(password, 8);
-    //   const verificationToken = crypto.randomBytes(20).toString("hex");
-    //   const tokenExpires = new Date();
-    //   tokenExpires.setHours(tokenExpires.getHours() + 1);
-
-    //   const result = await pool.query(
-    //     "INSERT INTO users (username, password_hash, email, is_verified, verification_token, token_expires) VALUES ($1, $2, $3, false, $4, $5) RETURNING *",
-    //     [username, hashedPassword, email, verificationToken, tokenExpires]
-    //   );
-
-    //   const user = result.rows[0];
-    //   await this.sendVerificationEmail(
-    //     email,
-    //     `http://localhost:4200/authentication/verify/${verificationToken}`
-    //   );
-    //   res.status(201).json({
-    //     user: user.username,
-    //     email: user.email,
-    //     status:
-    //       "В процесі верифікації. Перевірте будь ласка Вашу електронну пошту",
-    //   });
-    // } catch (error) {
-    //   res
-    //     .status(500)
-    //     .json({ message: "Error during registration: " + error.message });
-    // }
     const { username, password, email, code } = req.body;
     try {
       const codeResult = await pool.query(

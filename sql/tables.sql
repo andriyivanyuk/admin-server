@@ -31,6 +31,7 @@ INSERT INTO Statuses (status_name) VALUES ('Активний'), ('Неактив
 
 
 CREATE TABLE Products (
+    product_code VARCHAR(6) UNIQUE,
     product_id SERIAL PRIMARY KEY,
     title VARCHAR(255) NOT NULL,
     description TEXT,
@@ -121,4 +122,24 @@ CREATE TABLE registration_codes (
 -- DELETE FROM users
 -- WHERE role = 'client';
 
+-- Прискорення пошуку атрибутів за product_id
+CREATE INDEX idx_product_attributes_product_id ON product_attributes(product_id);
+
+-- Прискорення пошуку значень атрибутів за attribute_id
+CREATE INDEX idx_attribute_values_attribute_id ON attribute_values(attribute_id);
+
+-- Прискорення операцій над значеннями атрибутів
+CREATE INDEX idx_attribute_values_value ON attribute_values(value);
+
+-- Прискорення пошуку зображень за product_id
+CREATE INDEX idx_product_images_product_id ON product_images(product_id);
+
+-- Прискорення пошуку продуктів за product_id (запобігає Full Table Scan)
+CREATE INDEX idx_products_product_id ON products(product_id);
+
+-- Прискорення зв'язків статусів
+CREATE INDEX idx_products_status_id ON products(status_id);
+
+-- Прискорення пошуку категорій
+CREATE INDEX idx_products_category_id ON products(category_id);
 

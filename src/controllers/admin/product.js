@@ -21,6 +21,7 @@ class AdminProductsController {
       const productQuery = `
        SELECT 
        p.product_id, 
+       p.product_code, 
        p.title, 
        p.price, 
        p.stock, 
@@ -102,7 +103,6 @@ class AdminProductsController {
         result.attributes = [];
       }
 
-      // res.json(result);
       res.status(200).json({
         message: "Product details received",
         product: result,
@@ -114,7 +114,7 @@ class AdminProductsController {
     }
   }
 
-  async addProduct(req, res) {
+  addProduct = async (req, res) => {
     const { title, description, price, stock, category_id, status_id } =
       req.body;
     const images = req.files;
@@ -122,10 +122,21 @@ class AdminProductsController {
     try {
       await pool.query("BEGIN");
 
+      const uniqueCode = await this.generateUniqueProductCode();
+
       const productResult = await pool.query(
-        `INSERT INTO products (title, description, price, stock, category_id, created_by_user_id, status_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING product_id`,
-        [title, description, price, stock, category_id, req.user.id, status_id]
+        `INSERT INTO products (title, description, price, stock, category_id, created_by_user_id, status_id, product_code)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING product_id`,
+        [
+          title,
+          description,
+          price,
+          stock,
+          category_id,
+          req.user.id,
+          status_id,
+          uniqueCode,
+        ]
       );
 
       const productId = productResult.rows[0].product_id;
@@ -160,8 +171,9 @@ class AdminProductsController {
 
       await pool.query("COMMIT");
       res.status(200).json({
-        message: "Product created successfully",
+        message: "Продукт створено успішно",
         productId: productId,
+        productCode: uniqueCode,
         images: uploadedImages,
       });
     } catch (error) {
@@ -172,7 +184,7 @@ class AdminProductsController {
         error: error.message,
       });
     }
-  }
+  };
 
   updateProduct = async (req, res) => {
     const {
@@ -428,6 +440,22 @@ class AdminProductsController {
         }
       }
     }
+  };
+
+  generateUniqueProductCode = async () => {
+    let code;
+    let exists = true;
+    while (exists) {
+      code = Math.floor(100000 + Math.random() * 900000).toString();
+      const { rows } = await pool.query(
+        "SELECT 1 FROM products WHERE product_code = $1 LIMIT 1",
+        [code]
+      );
+      if (rows.length === 0) {
+        exists = false;
+      }
+    }
+    return code;
   };
 }
 
