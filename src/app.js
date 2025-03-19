@@ -41,7 +41,7 @@ const corsOptionsAdmin = {
 };
 
 const corsOptionsClient = {
-  origin: "http://localhost:4500",
+  origin: "http://localhost:4800",
   methods: "GET,HEAD,POST",
   optionsSuccessStatus: 200,
 };
@@ -73,7 +73,7 @@ const server = http.createServer(app);
 // Налаштування CORS для Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:4700",
+    origin: ["http://localhost:4700", "http://localhost:4200"],
     methods: ["GET", "POST"],
     allowedHeaders: ["Authorization"],
   },
