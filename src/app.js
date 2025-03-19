@@ -20,6 +20,7 @@ const superRoutes = require("./routes/admin/superAdminRoutes");
 //Client routes
 const productClientRoutes = require("./routes/client/productRoutes");
 const orderClientRoutes = require("./routes/client/orderRoutes");
+const novaPoshtaRoutes = require("./routes/client/novaPoshtaRoutes");
 
 const SECRET_KEY = process.env.SECRET_KEY;
 
@@ -67,6 +68,7 @@ app.use("/api/admin", cors(corsOptionsAdmin), orderStatusesAdminRoutes);
 // Client routes
 app.use("/api/client", cors(corsOptionsClient), productClientRoutes);
 app.use("/api/client", cors(corsOptionsClient), orderClientRoutes);
+app.use("/api/client", cors(corsOptionsClient), novaPoshtaRoutes);
 
 const server = http.createServer(app);
 

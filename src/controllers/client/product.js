@@ -16,7 +16,6 @@ class ClientProductsController {
       const countResult = await pool.query(countQuery, [`%${search}%`]);
       const totalProducts = parseInt(countResult.rows[0].total);
 
-      // Використовуємо jsonb_agg та jsonb_build_object для коректної роботи DISTINCT
       const productQuery = `
         SELECT 
           p.*, 
@@ -61,7 +60,7 @@ class ClientProductsController {
     }
   };
 
-  async getProductById(req, res) {
+  getProductById = async (req, res) => {
     const { id } = req.params;
     try {
       const product = await pool.query(
@@ -88,7 +87,7 @@ class ClientProductsController {
         .status(500)
         .json({ message: "Internal server error", error: error.message });
     }
-  }
+  };
 }
 
 module.exports = new ClientProductsController();

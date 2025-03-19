@@ -84,7 +84,9 @@ CREATE TABLE Orders (
     order_id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL REFERENCES Customers(customer_id) ON DELETE CASCADE,
     order_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    status_id INTEGER NOT NULL REFERENCES OrderStatuses(status_id) ON DELETE SET NULL
+    status_id INTEGER NOT NULL REFERENCES OrderStatuses(status_id) ON DELETE SET NULL,
+    comment TEXT,              -- нове поле для збереження коментаря замовлення
+    delivery_method VARCHAR(255)  -- нове поле для збереження способу доставки
 );
 
 CREATE TABLE OrderStatuses (
