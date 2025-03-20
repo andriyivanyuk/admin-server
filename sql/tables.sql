@@ -80,14 +80,20 @@ CREATE TABLE Customers (
     phone VARCHAR(255)
 );
 
+
 CREATE TABLE Orders (
     order_id SERIAL PRIMARY KEY,
     customer_id INTEGER NOT NULL REFERENCES Customers(customer_id) ON DELETE CASCADE,
     order_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     status_id INTEGER NOT NULL REFERENCES OrderStatuses(status_id) ON DELETE SET NULL,
-    comment TEXT,              -- нове поле для збереження коментаря замовлення
-    delivery_method VARCHAR(255)  -- нове поле для збереження способу доставки
+    comment TEXT,
+    delivery_city VARCHAR(255),
+    department_number VARCHAR(100),
+    customer_name VARCHAR(255), 
+    customer_phone VARCHAR(255)     
 );
+
+
 
 CREATE TABLE OrderStatuses (
     status_id SERIAL PRIMARY KEY,

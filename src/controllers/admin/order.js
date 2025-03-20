@@ -62,6 +62,8 @@ class AdminOrderController {
                 c.email, 
                 c.phone, 
                 c.title AS customer_name, 
+                o.delivery_city AS city,
+                o.department_number AS "departmentNumber",
                 json_agg(json_build_object(
                   'product_id', p.product_id,
                   'title', p.title,
@@ -74,10 +76,11 @@ class AdminOrderController {
          JOIN customers c ON o.customer_id = c.customer_id
          JOIN order_items oi ON o.order_id = oi.order_id
          JOIN products p ON oi.product_id = p.product_id
-         LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_primary = true
+         LEFT JOIN product_images pi 
+           ON p.product_id = pi.product_id AND pi.is_primary = true
          JOIN OrderStatuses os ON os.status_id = o.status_id
          WHERE o.order_id = $1
-         GROUP BY o.order_id, o.status_id, c.email, c.phone, c.title, os.status_name`,
+         GROUP BY o.order_id, o.status_id, c.email, c.phone, c.title, os.status_name, o.delivery_city, o.department_number`,
         [orderId]
       );
 
