@@ -202,7 +202,6 @@ class AdminProductsController {
     }
   };
 
-  // Оновлення товару; перевіряється, чи належить продукт поточному адміну
   updateProduct = async (req, res) => {
     const adminId = req.user && req.user.id;
     if (!adminId) return res.status(401).json({ message: "Unauthorized" });
@@ -224,7 +223,6 @@ class AdminProductsController {
     try {
       await pool.query("BEGIN");
 
-      // Перевірка власності товару
       const productCheck = await pool.query(
         "SELECT created_by_user_id FROM products WHERE product_id = $1",
         [product_id]
@@ -237,12 +235,14 @@ class AdminProductsController {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      if (deleteImageIds && deleteImageIds.length > 0) {
+      const deleteImgIds = JSON.parse(deleteImageIds);
+
+      if (!!deleteImgIds.length) {
         await imageService.deleteImages(deleteImageIds);
       }
 
       await pool.query(
-        `UPDATE products 
+        `UPDATE products
          SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, status_id = $6
          WHERE product_id = $7 AND created_by_user_id = $8`,
         [
@@ -368,7 +368,6 @@ class AdminProductsController {
     try {
       await pool.query("BEGIN");
 
-      // Перевірка, чи належить продукт поточному адміну
       const productCheck = await pool.query(
         "SELECT created_by_user_id FROM products WHERE product_id = $1",
         [id]
