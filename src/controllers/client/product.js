@@ -2,6 +2,20 @@ const pool = require("../../../config/db");
 
 class ClientProductsController {
   getProducts = async (req, res) => {
+    const storeId = req.headers["x-store-id"];
+    if (!storeId) {
+      return res.status(400).json({ message: "Missing store id in headers" });
+    }
+
+    const storeResult = await pool.query(
+      "SELECT user_id FROM Store WHERE store_id = $1",
+      [storeId]
+    );
+    if (storeResult.rows.length === 0) {
+      return res.status(404).json({ message: "Store not found" });
+    }
+    const adminId = storeResult.rows[0].user_id;
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
@@ -12,14 +26,22 @@ class ClientProductsController {
         SELECT COUNT(*) AS total 
         FROM products 
         WHERE lower(title) LIKE lower($1)
+          AND created_by_user_id = $2
       `;
-      const countResult = await pool.query(countQuery, [`%${search}%`]);
+      const countResult = await pool.query(countQuery, [
+        `%${search}%`,
+        adminId,
+      ]);
       const totalProducts = parseInt(countResult.rows[0].total);
 
       const productQuery = `
         SELECT 
-          p.*, 
-          s.status_name, 
+          p.product_id, 
+          p.product_code, 
+          p.title, 
+          p.price, 
+          p.stock, 
+          s.status_name AS status,
           p.created_by_user_id,
           jsonb_agg(
             DISTINCT jsonb_build_object(
@@ -42,12 +64,14 @@ class ClientProductsController {
         LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
         LEFT JOIN product_images pi ON p.product_id = pi.product_id
         WHERE lower(p.title) LIKE lower($1)
+          AND p.created_by_user_id = $2
         GROUP BY p.product_id, s.status_name
         ORDER BY p.product_id
-        LIMIT $2 OFFSET $3
+        LIMIT $3 OFFSET $4
       `;
       const result = await pool.query(productQuery, [
         `%${search}%`,
+        adminId,
         limit,
         offset,
       ]);
@@ -61,6 +85,20 @@ class ClientProductsController {
   };
 
   getProductById = async (req, res) => {
+    const storeId = req.headers["x-store-id"];
+    if (!storeId) {
+      return res.status(400).json({ message: "Missing store id in headers" });
+    }
+
+    const storeResult = await pool.query(
+      "SELECT user_id FROM Store WHERE store_id = $1",
+      [storeId]
+    );
+    if (storeResult.rows.length === 0) {
+      return res.status(404).json({ message: "Store not found" });
+    }
+    const adminId = storeResult.rows[0].user_id;
+
     const { id } = req.params;
     try {
       const product = await pool.query(
@@ -73,8 +111,9 @@ class ClientProductsController {
          JOIN statuses s ON p.status_id = s.status_id
          JOIN categories c ON p.category_id = c.category_id
          WHERE p.product_id = $1
+           AND p.created_by_user_id = $2
          GROUP BY p.product_id, s.status_name, c.title`,
-        [id]
+        [id, adminId]
       );
 
       if (product.rows.length === 0) {

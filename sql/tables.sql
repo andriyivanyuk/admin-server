@@ -126,6 +126,12 @@ CREATE TABLE registration_codes (
   created_at TIMESTAMP DEFAULT NOW(),
   expires_at TIMESTAMP
 );
+
+CREATE TABLE Store (
+    store_id VARCHAR(16) PRIMARY KEY,
+    user_id INTEGER NOT NULL UNIQUE REFERENCES Users(user_id) ON DELETE CASCADE
+);
+
 -- TRUNCATE TABLE orders RESTART IDENTITY CASCADE; clear data from table but table
 -- DELETE FROM users
 -- WHERE role = 'client';

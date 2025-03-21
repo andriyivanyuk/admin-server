@@ -5,7 +5,10 @@ const path = require("path");
 const imageService = require("../../services/imageService");
 
 class AdminProductsController {
-  async getProducts(req, res) {
+  getProducts = async (req, res) => {
+    const adminId = req.user && req.user.id;
+    if (!adminId) return res.status(401).json({ message: "Unauthorized" });
+
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 20;
     const offset = (page - 1) * limit;
@@ -13,29 +16,38 @@ class AdminProductsController {
 
     try {
       const countQuery = `
-        SELECT COUNT(*) AS total FROM products WHERE lower(title) LIKE lower($1)
+        SELECT COUNT(*) AS total 
+        FROM products 
+        WHERE lower(title) LIKE lower($1)
+          AND created_by_user_id = $2
       `;
-      const countResult = await pool.query(countQuery, [`%${search}%`]);
+      const countResult = await pool.query(countQuery, [
+        `%${search}%`,
+        adminId,
+      ]);
       const totalProducts = parseInt(countResult.rows[0].total);
 
       const productQuery = `
        SELECT 
-       p.product_id, 
-       p.product_code, 
-       p.title, 
-       p.price, 
-       p.stock, 
-       s.status_name AS status,
-       pi.image_path
-      FROM products p
-      JOIN statuses s ON p.status_id = s.status_id
-      LEFT JOIN product_images pi ON p.product_id = pi.product_id AND pi.is_primary = true
-      WHERE p.title ILIKE $1
-      ORDER BY p.product_id
-      LIMIT $2 OFFSET $3
+         p.product_id, 
+         p.product_code, 
+         p.title, 
+         p.price, 
+         p.stock, 
+         s.status_name AS status,
+         pi.image_path
+       FROM products p
+       JOIN statuses s ON p.status_id = s.status_id
+       LEFT JOIN product_images pi 
+         ON p.product_id = pi.product_id AND pi.is_primary = true
+       WHERE p.title ILIKE $1
+         AND p.created_by_user_id = $2
+       ORDER BY p.product_id
+       LIMIT $3 OFFSET $4
       `;
       const result = await pool.query(productQuery, [
         `%${search}%`,
+        adminId,
         limit,
         offset,
       ]);
@@ -46,9 +58,11 @@ class AdminProductsController {
         .status(500)
         .json({ message: "Internal server error", error: error.message });
     }
-  }
+  };
 
-  async getProductById(req, res) {
+  getProductById = async (req, res) => {
+    const adminId = req.user && req.user.id;
+    if (!adminId) return res.status(401).json({ message: "Unauthorized" });
     const { id } = req.params;
     try {
       const productQuery = `
@@ -83,17 +97,17 @@ class AdminProductsController {
         LEFT JOIN attribute_details ad ON p.product_id = ad.product_id
         LEFT JOIN product_images pi ON p.product_id = pi.product_id
         WHERE p.product_id = $1
+          AND p.created_by_user_id = $2
         GROUP BY p.product_id, s.status_id, c.category_id;
       `;
 
-      const product = await pool.query(productQuery, [id]);
+      const product = await pool.query(productQuery, [id, adminId]);
 
       if (product.rows.length === 0) {
         return res.status(404).json({ message: "Product not found" });
       }
 
       const result = product.rows[0];
-
       if (
         !result.attributes ||
         result.attributes.some(
@@ -103,18 +117,19 @@ class AdminProductsController {
         result.attributes = [];
       }
 
-      res.status(200).json({
-        message: "Product details received",
-        product: result,
-      });
+      res
+        .status(200)
+        .json({ message: "Product details received", product: result });
     } catch (error) {
       res
         .status(500)
         .json({ message: "Internal server error", error: error.message });
     }
-  }
+  };
 
   addProduct = async (req, res) => {
+    const adminId = req.user && req.user.id;
+    if (!adminId) return res.status(401).json({ message: "Unauthorized" });
     const { title, description, price, stock, category_id, status_id } =
       req.body;
     const images = req.files;
@@ -125,15 +140,17 @@ class AdminProductsController {
       const uniqueCode = await this.generateUniqueProductCode();
 
       const productResult = await pool.query(
-        `INSERT INTO products (title, description, price, stock, category_id, created_by_user_id, status_id, product_code)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING product_id`,
+        `INSERT INTO products 
+           (title, description, price, stock, category_id, created_by_user_id, status_id, product_code)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           RETURNING product_id`,
         [
           title,
           description,
           price,
           stock,
           category_id,
-          req.user.id,
+          adminId,
           status_id,
           uniqueCode,
         ]
@@ -179,14 +196,16 @@ class AdminProductsController {
     } catch (error) {
       await pool.query("ROLLBACK");
       console.error("Error inserting product:", error);
-      res.status(500).json({
-        message: "Internal server error",
-        error: error.message,
-      });
+      res
+        .status(500)
+        .json({ message: "Internal server error", error: error.message });
     }
   };
 
+  // Оновлення товару; перевіряється, чи належить продукт поточному адміну
   updateProduct = async (req, res) => {
+    const adminId = req.user && req.user.id;
+    if (!adminId) return res.status(401).json({ message: "Unauthorized" });
     const {
       product_id,
       title,
@@ -199,21 +218,43 @@ class AdminProductsController {
       deleteImageIds,
       selectedImageId,
     } = req.body;
-
     const newImages = req.files;
     const selectedId = selectedImageId;
 
     try {
       await pool.query("BEGIN");
 
+      // Перевірка власності товару
+      const productCheck = await pool.query(
+        "SELECT created_by_user_id FROM products WHERE product_id = $1",
+        [product_id]
+      );
+      if (
+        productCheck.rows.length === 0 ||
+        productCheck.rows[0].created_by_user_id !== adminId
+      ) {
+        await pool.query("ROLLBACK");
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       if (deleteImageIds && deleteImageIds.length > 0) {
         await imageService.deleteImages(deleteImageIds);
       }
 
       await pool.query(
-        `UPDATE products SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, status_id = $6
-           WHERE product_id = $7`,
-        [title, description, price, stock, category_id, status_id, product_id]
+        `UPDATE products 
+         SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, status_id = $6
+         WHERE product_id = $7 AND created_by_user_id = $8`,
+        [
+          title,
+          description,
+          price,
+          stock,
+          category_id,
+          status_id,
+          product_id,
+          adminId,
+        ]
       );
 
       await pool.query(
@@ -240,14 +281,12 @@ class AdminProductsController {
       await pool.query("COMMIT");
 
       const defaultImages = await imageService.getImagesByProductId(product_id);
-
       if (defaultImages.length && !!selectedId) {
         await pool.query(
           "UPDATE product_images SET is_primary = true WHERE image_id = $1",
           [parseInt(selectedId)]
         );
       }
-
       if (newImages.length) {
         await imageService.uploadImages(
           product_id,
@@ -296,13 +335,11 @@ class AdminProductsController {
       const updatedProduct = await pool.query(updatedProductQuery, [
         product_id,
       ]);
-
       if (updatedProduct.rows.length === 0) {
         return res.status(404).json({ message: "Product not found" });
       }
 
       const result = updatedProduct.rows[0];
-
       if (
         !result.attributes ||
         result.attributes.some(
@@ -312,10 +349,9 @@ class AdminProductsController {
         result.attributes = [];
       }
 
-      res.status(200).json({
-        message: "Product updated successfully",
-        product: result,
-      });
+      res
+        .status(200)
+        .json({ message: "Product updated successfully", product: result });
     } catch (error) {
       await pool.query("ROLLBACK");
       console.error("Error updating product:", error);
@@ -326,9 +362,24 @@ class AdminProductsController {
   };
 
   async deleteProduct(req, res) {
+    const adminId = req.user && req.user.id;
+    if (!adminId) return res.status(401).json({ message: "Unauthorized" });
     const { id } = req.params;
     try {
       await pool.query("BEGIN");
+
+      // Перевірка, чи належить продукт поточному адміну
+      const productCheck = await pool.query(
+        "SELECT created_by_user_id FROM products WHERE product_id = $1",
+        [id]
+      );
+      if (
+        productCheck.rows.length === 0 ||
+        productCheck.rows[0].created_by_user_id !== adminId
+      ) {
+        await pool.query("ROLLBACK");
+        return res.status(403).json({ message: "Access denied" });
+      }
 
       const ordersCheck = await pool.query(
         "SELECT 1 FROM order_items WHERE product_id = $1 LIMIT 1",
@@ -418,7 +469,6 @@ class AdminProductsController {
             "DELETE FROM attribute_values WHERE attribute_id = $1",
             [attributeId]
           );
-
           for (const value of attr.values) {
             await pool.query(
               "INSERT INTO attribute_values (attribute_id, value) VALUES ($1, $2)",

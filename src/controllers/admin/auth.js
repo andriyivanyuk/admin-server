@@ -22,18 +22,19 @@ class AuthController {
   register = async (req, res) => {
     const { username, password, email, code } = req.body;
     try {
+      // Перевірка реєстраційного коду
       const codeResult = await pool.query(
         `SELECT * FROM registration_codes
          WHERE code = $1 AND is_used = false`,
         [code]
       );
-
       if (codeResult.rows.length === 0) {
         return res
           .status(400)
           .json({ message: "Невірний або прострочений код реєстрації." });
       }
 
+      // Перевірка, чи існує користувач з таким email
       const existingUser = await pool.query(
         "SELECT * FROM users WHERE email = $1",
         [email]
@@ -60,13 +61,33 @@ class AuthController {
         [code]
       );
 
+      let storeId;
+      let isUnique = false;
+      while (!isUnique) {
+        storeId = crypto.randomBytes(8).toString("hex");
+        const storeCheck = await pool.query(
+          "SELECT * FROM Store WHERE store_id = $1",
+          [storeId]
+        );
+        if (storeCheck.rows.length === 0) {
+          isUnique = true;
+        }
+      }
+
+      await pool.query(
+        "INSERT INTO Store (store_id, user_id) VALUES ($1, $2)",
+        [storeId, user.user_id]
+      );
+
       await this.sendVerificationEmail(
         email,
         `http://localhost:4200/authentication/verify/${verificationToken}`
       );
+
       res.status(201).json({
         user: user.username,
         email: user.email,
+        storeId: storeId,
         status:
           "В процесі верифікації. Перевірте, будь ласка, Вашу електронну пошту",
       });
@@ -137,42 +158,6 @@ class AuthController {
   };
 
   login = async (req, res) => {
-    // const { email, password } = req.body;
-
-    // try {
-    //   const result = await pool.query("SELECT * FROM users WHERE email = $1", [
-    //     email,
-    //   ]);
-
-    //   const user = result.rows[0];
-    //   if (!user) {
-    //     return res.status(404).send("Користувача не знайдено");
-    //   }
-
-    //   if (!user.is_verified) {
-    //     return res
-    //       .status(403)
-    //       .send(
-    //         "Ваш акаунт не верифіковано. Будь ласка, перейдіть по посиланню відправленому на вашу електронну пошту для завершення реєстрації."
-    //       );
-    //   }
-
-    //   const isPasswordValid = await bcrypt.compare(
-    //     password,
-    //     user.password_hash
-    //   );
-    //   if (!isPasswordValid) {
-    //     return res.status(401).send("Невірний пароль");
-    //   }
-
-    //   const token = jwt.sign({ id: user.user_id }, process.env.SECRET_KEY, {
-    //     expiresIn: "1d",
-    //   });
-    //   res.send({ user, token });
-    // } catch (error) {
-    //   res.status(500).send("Помилка підчас логіну: " + error.message);
-    // }
-
     const { email, password } = req.body;
 
     try {
