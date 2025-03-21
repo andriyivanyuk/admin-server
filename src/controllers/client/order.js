@@ -2,6 +2,35 @@ const pool = require("../../../config/db");
 
 class ClientOrderController {
   createOrder = async (req, res) => {
+    const storeId = req.headers["x-store-id"];
+    if (!storeId) {
+      return res.status(400).json({ message: "Missing store id in headers" });
+    }
+
+    const storeResult = await pool.query(
+      "SELECT user_id FROM Store WHERE store_id = $1",
+      [storeId]
+    );
+    if (storeResult.rows.length === 0) {
+      return res.status(404).json({ message: "Store not found" });
+    }
+    const adminId = storeResult.rows[0].user_id;
+
+    const userResult = await pool.query(
+      "SELECT role FROM users WHERE user_id = $1",
+      [adminId]
+    );
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const role = userResult.rows[0].role;
+    if (role === "superadmin") {
+      return res.status(403).json({
+        message:
+          "Access denied: Superadmin's products are not available in the public store.",
+      });
+    }
+
     const {
       email,
       phone,
@@ -12,9 +41,7 @@ class ClientOrderController {
       city,
       departmentNumber,
     } = req.body;
-
     const fullName = `${firstName} ${lastName}`;
-
     const trimmedDepartmentNumber = departmentNumber.substring(0, 100);
 
     try {
@@ -26,14 +53,28 @@ class ClientOrderController {
       );
       const customerId = customerResult.rows[0].customer_id;
 
+      for (const item of items) {
+        const prodResult = await pool.query(
+          "SELECT created_by_user_id FROM products WHERE product_id = $1",
+          [item.product_id]
+        );
+        if (
+          prodResult.rows.length === 0 ||
+          prodResult.rows[0].created_by_user_id !== adminId
+        ) {
+          await pool.query("ROLLBACK");
+          return res.status(403).json({
+            message: `Access denied: Product ${item.product_id} does not belong to this store.`,
+          });
+        }
+      }
+
       const statusResult = await pool.query(
         "SELECT status_id FROM OrderStatuses WHERE status_name = 'Новий'"
       );
       if (statusResult.rows.length === 0) {
-        res
-          .status(500)
-          .json({ message: "Статус 'Новий' не знайдено в базі даних." });
-        return;
+        await pool.query("ROLLBACK");
+        return res.status(500).json({ message: "Status 'Новий' not found." });
       }
       const statusId = statusResult.rows[0].status_id;
 
@@ -101,10 +142,9 @@ class ClientOrderController {
 
         const orderData = orderDetails.rows[0];
         orderData.total_cost = totalCost;
-
         io.emit("newOrder", orderData);
       } else {
-        console.error("❌ WebSocket-сервер (io) не знайдено");
+        console.error("WebSocket server not found");
       }
 
       res.status(201).json({

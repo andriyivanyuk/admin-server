@@ -14,9 +14,9 @@ class AdminStoreController {
       );
 
       if (result.rows.length === 0) {
-        return res
-          .status(404)
-          .json({ message: "Store not found for the current admin" });
+        return res.status(404).json({
+          message: "Магазин не знайдено для поточного адміністратора.",
+        });
       }
 
       res.status(200).json({ store_id: result.rows[0].store_id });

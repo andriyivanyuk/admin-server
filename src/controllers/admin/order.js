@@ -1,5 +1,4 @@
 const pool = require("../../../config/db");
-
 const nodemailer = require("nodemailer");
 const { google } = require("googleapis");
 
@@ -17,6 +16,9 @@ oauth2Client.setCredentials({
 
 class AdminOrderController {
   getOrders = async (req, res) => {
+    const adminId = req.user && req.user.id;
+    if (!adminId) return res.status(401).json({ message: "Unauthorized" });
+
     try {
       const ordersData = await pool.query(
         `SELECT 
@@ -41,7 +43,17 @@ class AdminOrderController {
          LEFT JOIN product_images pi 
            ON p.product_id = pi.product_id AND pi.is_primary = true
          JOIN OrderStatuses os ON os.status_id = o.status_id
-         GROUP BY o.order_id, o.status_id, c.email, c.phone, c.title, os.status_name`
+         WHERE lower(c.title) LIKE lower($1)
+           AND EXISTS (
+             SELECT 1 
+             FROM order_items oi2 
+             JOIN products p2 ON oi2.product_id = p2.product_id
+             WHERE oi2.order_id = o.order_id 
+               AND p2.created_by_user_id = $2
+           )
+         GROUP BY o.order_id, o.status_id, c.email, c.phone, c.title, os.status_name
+         ORDER BY o.order_id`,
+        [`%${req.query.search || ""}%`, adminId]
       );
 
       res.status(200).json(ordersData.rows);
@@ -53,6 +65,8 @@ class AdminOrderController {
   };
 
   getOrderDetails = async (req, res) => {
+    const adminId = req.user && req.user.id;
+    if (!adminId) return res.status(401).json({ message: "Unauthorized" });
     const { orderId } = req.params;
     try {
       const orderDetails = await pool.query(
@@ -78,10 +92,17 @@ class AdminOrderController {
          JOIN products p ON oi.product_id = p.product_id
          LEFT JOIN product_images pi 
            ON p.product_id = pi.product_id AND pi.is_primary = true
-         JOIN OrderStatuses os ON os.status_id = o.status_id
+         JOIN OrderStatuses os ON o.status_id = os.status_id
          WHERE o.order_id = $1
+           AND EXISTS (
+             SELECT 1 
+             FROM order_items oi2 
+             JOIN products p2 ON oi2.product_id = p2.product_id
+             WHERE oi2.order_id = o.order_id
+               AND p2.created_by_user_id = $2
+           )
          GROUP BY o.order_id, o.status_id, c.email, c.phone, c.title, os.status_name, o.delivery_city, o.department_number`,
-        [orderId]
+        [orderId, adminId]
       );
 
       if (orderDetails.rows.length > 0) {
@@ -97,6 +118,8 @@ class AdminOrderController {
   };
 
   updateOrderStatus = async (req, res) => {
+    const adminId = req.user && req.user.id;
+    if (!adminId) return res.status(401).json({ message: "Unauthorized" });
     const { orderId } = req.params;
     const { statusId } = req.body;
 
@@ -105,11 +128,26 @@ class AdminOrderController {
         "SELECT 1 FROM OrderStatuses WHERE status_id = $1",
         [statusId]
       );
-
       if (statusExists.rowCount === 0) {
         return res
           .status(404)
           .json({ message: "Статус замовлення не знайдено." });
+      }
+
+      const orderCheck = await pool.query(
+        `SELECT 1 
+         FROM orders o
+         JOIN order_items oi ON o.order_id = oi.order_id
+         JOIN products p ON oi.product_id = p.product_id
+         WHERE o.order_id = $1
+           AND p.created_by_user_id = $2
+         GROUP BY o.order_id`,
+        [orderId, adminId]
+      );
+      if (orderCheck.rowCount === 0) {
+        return res
+          .status(403)
+          .json({ message: "Access denied: Order does not belong to you" });
       }
 
       const updateResult = await pool.query(
@@ -130,13 +168,11 @@ class AdminOrderController {
         if (orderData.rows.length > 0) {
           const order = orderData.rows[0];
           const emailBody = `<p>Ваше замовлення №${orderId} "${order.status_name}".</p><p>Дякуємо, що вибрали нас!</p>`;
-
           await this.sendEmail(
             order.email,
             "Оновлення статусу замовлення",
             emailBody
           );
-
           res.json({
             message: "Статус замовлення та повідомлення успішно оновлено",
             order: order,
