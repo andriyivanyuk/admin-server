@@ -5,6 +5,7 @@ const http = require("http");
 
 const { Server } = require("socket.io");
 const jwt = require("jsonwebtoken");
+const helmet = require("helmet");
 
 //Admin routes
 const authRoutes = require("./routes/admin/authRoutes");
@@ -50,6 +51,8 @@ const corsOptionsClient = {
 };
 
 app.use(express.json());
+app.use(helmet());
+
 app.use("/uploads", express.static("uploads"));
 
 // SUPER ADMIN routes
