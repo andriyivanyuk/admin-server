@@ -1,23 +1,27 @@
 const pool = require("../../config/db");
 const fs = require("fs");
 const path = require("path");
+const { uploadFile } = require("../../modules/uploadToR2");
 
 class ImageService {
-  async uploadImages(productId, images) {
+  async uploadImages(productId, images, adminId) {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      const promises = images.map((image) =>
-        client.query(
+      const promises = images.map(async (image) => {
+        const imageUrl = await uploadFile(adminId, productId, image.path);
+        await fs.promises.unlink(image.path);
+        const result = await client.query(
           "INSERT INTO Product_Images (product_id, image_path, is_primary) VALUES ($1, $2, $3) RETURNING *;",
-          [productId, image.path, image.isPrimary]
-        )
-      );
+          [productId, imageUrl, image.isPrimary]
+        );
+        return result.rows[0];
+      });
 
       const results = await Promise.all(promises);
       await client.query("COMMIT");
-      return results.map((result) => result.rows[0]);
+      return results;
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;

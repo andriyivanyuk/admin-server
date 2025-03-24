@@ -183,7 +183,8 @@ class AdminProductsController {
         images.map((img, index) => ({
           path: img.path,
           isPrimary: index.toString() === req.body.primary,
-        }))
+        })),
+        adminId
       );
 
       await pool.query("COMMIT");
