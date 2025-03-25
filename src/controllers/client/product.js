@@ -41,6 +41,7 @@ class ClientProductsController {
           p.title, 
           p.price, 
           p.stock, 
+          p.product_type,        
           s.status_name AS status,
           p.created_by_user_id,
           jsonb_agg(
@@ -102,7 +103,11 @@ class ClientProductsController {
     const { id } = req.params;
     try {
       const product = await pool.query(
-        `SELECT p.*, s.status_name, c.title as category_title,
+        `SELECT 
+          p.*, 
+          s.status_name, 
+          c.title as category_title,
+          p.product_type,          
           (SELECT json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) 
            FROM product_attributes pa WHERE pa.product_id = p.product_id) AS attributes,
           (SELECT json_agg(json_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) 

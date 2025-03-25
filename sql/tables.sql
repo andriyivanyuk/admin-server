@@ -40,6 +40,7 @@ CREATE TABLE Products (
     category_id INTEGER NOT NULL REFERENCES Categories(category_id) ON DELETE CASCADE,
     created_by_user_id INTEGER NOT NULL REFERENCES Users(user_id) ON DELETE CASCADE,
     status_id INTEGER REFERENCES Statuses(status_id) ON DELETE SET NULL,
+    product_type VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

@@ -1,6 +1,4 @@
 const pool = require("../../../config/db");
-const fs = require("fs");
-const path = require("path");
 
 const imageService = require("../../services/imageService");
 
@@ -34,6 +32,7 @@ class AdminProductsController {
          p.title, 
          p.price, 
          p.stock, 
+         p.product_type,    -- нове поле
          s.status_name AS status,
          pi.image_path
        FROM products p
@@ -79,12 +78,14 @@ class AdminProductsController {
         )
         SELECT 
             p.product_id, 
+            p.product_code,
             p.title, 
             p.description, 
             p.price, 
             p.stock, 
             p.category_id, 
             p.status_id, 
+            p.product_type,   -- нове поле
             p.created_at, 
             p.updated_at, 
             s.status_name, 
@@ -130,8 +131,16 @@ class AdminProductsController {
   addProduct = async (req, res) => {
     const adminId = req.user && req.user.id;
     if (!adminId) return res.status(401).json({ message: "Unauthorized" });
-    const { title, description, price, stock, category_id, status_id } =
-      req.body;
+    // Додаємо product_type до отриманих даних
+    const {
+      title,
+      description,
+      price,
+      stock,
+      category_id,
+      status_id,
+      product_type,
+    } = req.body;
     const images = req.files;
 
     try {
@@ -141,8 +150,8 @@ class AdminProductsController {
 
       const productResult = await pool.query(
         `INSERT INTO products 
-           (title, description, price, stock, category_id, created_by_user_id, status_id, product_code)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           (title, description, price, stock, category_id, created_by_user_id, status_id, product_code, product_type)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            RETURNING product_id`,
         [
           title,
@@ -153,6 +162,7 @@ class AdminProductsController {
           adminId,
           status_id,
           uniqueCode,
+          product_type, // додаємо значення типу продукту
         ]
       );
 
@@ -215,6 +225,7 @@ class AdminProductsController {
       stock,
       category_id,
       status_id,
+      product_type,
       attributes,
       deleteImageIds,
       primaryIndex,
@@ -250,8 +261,8 @@ class AdminProductsController {
 
       await pool.query(
         `UPDATE products
-         SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, status_id = $6, updated_at = CURRENT_TIMESTAMP
-         WHERE product_id = $7 AND created_by_user_id = $8`,
+         SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, status_id = $6, product_type = $7, updated_at = CURRENT_TIMESTAMP
+         WHERE product_id = $8 AND created_by_user_id = $9`,
         [
           title,
           description,
@@ -259,6 +270,7 @@ class AdminProductsController {
           stock,
           category_id,
           status_id,
+          product_type,
           product_id,
           adminId,
         ]
@@ -328,12 +340,14 @@ class AdminProductsController {
         )
         SELECT 
             p.product_id, 
+            p.product_code,
             p.title, 
             p.description, 
             p.price, 
             p.stock, 
             p.category_id, 
             p.status_id, 
+            p.product_type,
             p.created_at, 
             p.updated_at, 
             s.status_name, 
