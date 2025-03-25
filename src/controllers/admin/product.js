@@ -206,6 +206,7 @@ class AdminProductsController {
   updateProduct = async (req, res) => {
     const adminId = req.user && req.user.id;
     if (!adminId) return res.status(401).json({ message: "Unauthorized" });
+
     const {
       product_id,
       title,
@@ -216,10 +217,9 @@ class AdminProductsController {
       status_id,
       attributes,
       deleteImageIds,
-      selectedImageId,
+      primaryIndex,
     } = req.body;
     const newImages = req.files;
-    const selectedId = selectedImageId;
 
     try {
       await pool.query("BEGIN");
@@ -236,15 +236,21 @@ class AdminProductsController {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const deleteImgIds = JSON.parse(deleteImageIds);
-
-      if (!!deleteImgIds.length) {
-        await imageService.deleteImages(deleteImageIds);
+      let deleteImgIds = [];
+      if (deleteImageIds) {
+        try {
+          deleteImgIds = JSON.parse(deleteImageIds);
+        } catch (e) {
+          deleteImgIds = [];
+        }
+      }
+      if (deleteImgIds.length > 0) {
+        await imageService.deleteImages(deleteImgIds);
       }
 
       await pool.query(
         `UPDATE products
-         SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, status_id = $6
+         SET title = $1, description = $2, price = $3, stock = $4, category_id = $5, status_id = $6, updated_at = CURRENT_TIMESTAMP
          WHERE product_id = $7 AND created_by_user_id = $8`,
         [
           title,
@@ -281,21 +287,31 @@ class AdminProductsController {
 
       await pool.query("COMMIT");
 
-      const defaultImages = await imageService.getImagesByProductId(product_id);
-      if (defaultImages.length && !!selectedId) {
-        await pool.query(
-          "UPDATE product_images SET is_primary = true WHERE image_id = $1",
-          [parseInt(selectedId)]
-        );
-      }
-      if (newImages.length) {
-        await imageService.uploadImages(
+      let uploadedImages = [];
+      if (newImages && newImages.length > 0) {
+        uploadedImages = await imageService.uploadImages(
           product_id,
           newImages.map((img) => ({
             path: img.path,
             isPrimary: false,
-          }))
+          })),
+          adminId
         );
+      }
+
+      if (!!primaryIndex) {
+        const indexPrimary = parseInt(primaryIndex, 10);
+        const allImages = await imageService.getImagesByProductId(product_id);
+        if (!isNaN(indexPrimary) && allImages.length > indexPrimary) {
+          await pool.query(
+            "UPDATE product_images SET is_primary = false WHERE product_id = $1",
+            [product_id]
+          );
+          await pool.query(
+            "UPDATE product_images SET is_primary = true WHERE image_id = $1",
+            [allImages[indexPrimary].image_id]
+          );
+        }
       }
 
       const updatedProductQuery = `
@@ -332,7 +348,6 @@ class AdminProductsController {
         WHERE p.product_id = $1
         GROUP BY p.product_id, s.status_id, c.category_id;
       `;
-
       const updatedProduct = await pool.query(updatedProductQuery, [
         product_id,
       ]);
@@ -350,13 +365,13 @@ class AdminProductsController {
         result.attributes = [];
       }
 
-      res
+      return res
         .status(200)
         .json({ message: "Product updated successfully", product: result });
     } catch (error) {
       await pool.query("ROLLBACK");
       console.error("Error updating product:", error);
-      res
+      return res
         .status(500)
         .json({ message: "Internal server error", error: error.message });
     }
@@ -385,7 +400,6 @@ class AdminProductsController {
         "SELECT 1 FROM order_items WHERE product_id = $1 LIMIT 1",
         [id]
       );
-
       if (ordersCheck.rowCount > 0) {
         await pool.query("ROLLBACK");
         return res.status(400).json({
@@ -393,41 +407,39 @@ class AdminProductsController {
         });
       }
 
-      const images = await pool.query(
-        "SELECT image_path FROM product_images WHERE product_id = $1",
+      const imagesResult = await pool.query(
+        "SELECT image_id, image_path FROM product_images WHERE product_id = $1",
         [id]
       );
 
-      await pool.query("DELETE FROM product_images WHERE product_id = $1", [
-        id,
-      ]);
+      if (imagesResult.rows.length) {
+        const imageIds = imagesResult.rows.map((img) => img.image_id);
+        await imageService.deleteImages(imageIds);
+      }
+
+      await pool.query(
+        "DELETE FROM attribute_values WHERE attribute_id IN (SELECT attribute_id FROM product_attributes WHERE product_id = $1)",
+        [id]
+      );
       await pool.query("DELETE FROM product_attributes WHERE product_id = $1", [
         id,
       ]);
-      await pool.query(
+
+      const deleteProductResult = await pool.query(
         "DELETE FROM products WHERE product_id = $1 RETURNING *",
         [id]
       );
-
-      images.rows.forEach((image) => {
-        const imagePath = path.join(
-          __dirname,
-          "..",
-          "..",
-          "..",
-          image.image_path
-        );
-        fs.unlink(imagePath, (err) => {
-          if (err) console.error("Failed to delete image:", err);
-        });
-      });
+      if (deleteProductResult.rows.length === 0) {
+        await pool.query("ROLLBACK");
+        return res.status(404).json({ message: "Product not found" });
+      }
 
       await pool.query("COMMIT");
-      res.json({ message: "Продукт видалено успішно" });
+      return res.json({ message: "Продукт видалено успішно" });
     } catch (error) {
       await pool.query("ROLLBACK");
       console.error("Error during product deletion:", error);
-      res
+      return res
         .status(500)
         .json({ message: "Internal server error", error: error.message });
     }
