@@ -36,37 +36,33 @@ class ClientProductsController {
 
       const productQuery = `
         SELECT 
-          p.product_id, 
-          p.product_code, 
-          p.title, 
-          p.price, 
-          p.stock, 
-          p.product_type,        
-          s.status_name AS status,
-          p.created_by_user_id,
-          jsonb_agg(
-            DISTINCT jsonb_build_object(
-              'key', pa.attribute_key,
+          p.*, 
+          s.status_name, 
+          c.title as category_title,
+          (SELECT json_agg(json_build_object(
+              'key', pa.attribute_key, 
               'values', (
                 SELECT jsonb_agg(av.value)
                 FROM attribute_values av
                 WHERE av.attribute_id = pa.attribute_id
               )
-            )
+            ))
+           FROM product_attributes pa
+           WHERE pa.product_id = p.product_id
           ) AS attributes,
-          jsonb_agg(
-            DISTINCT jsonb_build_object(
-              'image_path', pi.image_path,
+          (SELECT json_agg(json_build_object(
+              'image_id', pi.image_id,
+              'image_path', pi.image_path, 
               'is_primary', pi.is_primary
-            )
+            ))
+           FROM product_images pi
+           WHERE pi.product_id = p.product_id
           ) AS images
         FROM products p
         JOIN statuses s ON p.status_id = s.status_id
-        LEFT JOIN product_attributes pa ON p.product_id = pa.product_id
-        LEFT JOIN product_images pi ON p.product_id = pi.product_id
+        JOIN categories c ON p.category_id = c.category_id
         WHERE lower(p.title) LIKE lower($1)
           AND p.created_by_user_id = $2
-        GROUP BY p.product_id, s.status_name
         ORDER BY p.product_id
         LIMIT $3 OFFSET $4
       `;
@@ -77,6 +73,7 @@ class ClientProductsController {
         offset,
       ]);
 
+      // Повертаємо результат із додатковою інформацією про пагінацію
       res.json({ products: result.rows, total: totalProducts, page, limit });
     } catch (error) {
       res
@@ -104,14 +101,33 @@ class ClientProductsController {
     try {
       const product = await pool.query(
         `SELECT 
-          p.*, 
-          s.status_name, 
-          c.title as category_title,
-          p.product_type,          
-          (SELECT json_agg(json_build_object('key', pa.attribute_key, 'value', pa.attribute_value)) 
-           FROM product_attributes pa WHERE pa.product_id = p.product_id) AS attributes,
-          (SELECT json_agg(json_build_object('image_id', pi.image_id, 'image_path', pi.image_path, 'is_primary', pi.is_primary)) 
-           FROM product_images pi WHERE pi.product_id = p.product_id) AS images
+            p.*, 
+            s.status_name, 
+            c.title as category_title,
+            p.product_type,
+            (SELECT json_agg(
+                  json_build_object(
+                    'key', pa.attribute_key,
+                    'values', (
+                      SELECT jsonb_agg(av.value)
+                      FROM attribute_values av
+                      WHERE av.attribute_id = pa.attribute_id
+                    )
+                  )
+                )
+             FROM product_attributes pa 
+             WHERE pa.product_id = p.product_id
+            ) AS attributes,
+            (SELECT json_agg(
+                  json_build_object(
+                    'image_id', pi.image_id, 
+                    'image_path', pi.image_path, 
+                    'is_primary', pi.is_primary
+                  )
+                )
+             FROM product_images pi 
+             WHERE pi.product_id = p.product_id
+            ) AS images
          FROM products p
          JOIN statuses s ON p.status_id = s.status_id
          JOIN categories c ON p.category_id = c.category_id
